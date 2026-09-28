@@ -14,6 +14,7 @@
  * Delivery is at-least-once: a crash between the provider call and the status
  * update can resend once after the stuck-row recovery (10 min).
  */
+import { waitUntil } from "@vercel/functions";
 import { MAX_NOTIFICATION_ATTEMPTS, SAMPLE_TEMPLATE_VALUES, type EmailTemplateKey } from "@booking/shared";
 import { env, isTest } from "../../config/env.js";
 import { logger } from "../../config/logger.js";
@@ -202,10 +203,13 @@ registerTaskQueue(TASK_QUEUE, async (data) => {
 });
 
 // ---------------------------------------------------------------------------
-// Prompt dispatch after new rows are queued (the 30 s sweep is the backstop).
+// Prompt dispatch after new rows are queued (the cron/scheduler sweep is the
+// backstop — see jobs/scheduler.ts locally, or the /internal/cron routes on
+// Vercel). waitUntil() keeps a serverless function alive long enough to
+// finish this after the response is sent; outside Vercel it's a no-op and
+// the promise just runs in the background as it always did.
 // ---------------------------------------------------------------------------
 
-let timer: NodeJS.Timeout | null = null;
 let running = false;
 let again = false;
 let autoDispatch = !isTest;
@@ -215,13 +219,9 @@ export function setAutoDispatch(on: boolean): void {
   autoDispatch = on;
 }
 
-export function requestDispatch(delayMs = 1_000): void {
-  if (!autoDispatch || timer) return;
-  timer = setTimeout(() => {
-    timer = null;
-    void runDispatchOnce();
-  }, delayMs);
-  timer.unref();
+export function requestDispatch(): void {
+  if (!autoDispatch) return;
+  waitUntil(runDispatchOnce());
 }
 
 /** Single-flight wrapper used by the timer and the scheduler. */

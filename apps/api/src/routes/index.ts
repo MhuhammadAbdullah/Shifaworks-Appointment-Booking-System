@@ -18,6 +18,7 @@ import { reportsRouter } from "../modules/reports/reports.routes.js";
 import { auditRouter } from "../modules/audit/audit.routes.js";
 import { settingsRouter } from "../modules/settings/settings.routes.js";
 import { checkinRouter } from "../modules/checkin/checkin.routes.js";
+import { cronRouter } from "../modules/cron/cron.routes.js";
 
 /**
  * /api/v1 router. Modules are mounted here as their phase lands
@@ -57,3 +58,4 @@ apiRouter.use("/reports", reportsRouter);
 apiRouter.use("/audit-logs", auditRouter);
 apiRouter.use("/admin/settings", settingsRouter);
 apiRouter.use("/check-in", checkinRouter);
+apiRouter.use("/internal/cron", cronRouter);

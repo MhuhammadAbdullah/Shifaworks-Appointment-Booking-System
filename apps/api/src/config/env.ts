@@ -48,8 +48,13 @@ const EnvSchema = z.object({
   REDIS_URL: z.string().optional(),
   QUEUE_ENABLED: booleanString.default(false),
   // Run queue workers and schedulers inside the API process. Set false when a
-  // separate `npm run worker` process does that work.
+  // separate `npm run worker` process does that work, or on serverless
+  // platforms (Vercel) where nothing stays running between requests — there,
+  // Vercel Cron hits /internal/cron/* instead (see routes/index.ts) and this
+  // secret authenticates those requests (Vercel sends it as a Bearer token
+  // automatically once CRON_SECRET is set as a project env var).
   RUN_WORKERS: booleanString.default(true),
+  CRON_SECRET: z.string().optional(),
 
   // --- Email ------------------------------------------------------------------
   // "console" logs messages instead of sending them (development default).

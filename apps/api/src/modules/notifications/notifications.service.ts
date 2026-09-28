@@ -77,7 +77,7 @@ export async function retryNotification(p: Principal, id: string, ctx: AuditCont
   });
   if (r.count !== 1) throw AppError.badRequest("Only a failed or skipped message can be retried");
   await recordAudit(prisma, ctx, { action: "notification.retry", entityType: "notification", entityId: id });
-  requestDispatch(200);
+  requestDispatch();
   return getNotification(p, id);
 }
 
