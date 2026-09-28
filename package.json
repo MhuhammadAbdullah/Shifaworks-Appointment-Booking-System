@@ -1,0 +1,30 @@
+{
+  "name": "booking-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Booking & Practice Management System (monorepo)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "build:shared": "npm run build -w @booking/shared",
+    "build": "npm run build:shared && npm run build -w @booking/api && npm run build -w @booking/web",
+    "dev:api": "npm run build:shared && concurrently -k -n shared,api -c gray,cyan \"npm run dev -w @booking/shared -- --preserveWatchOutput\" \"npm run dev -w @booking/api\"",
+    "dev:web": "npm run build:shared && concurrently -k -n shared,web -c gray,magenta \"npm run dev -w @booking/shared -- --preserveWatchOutput\" \"npm run dev -w @booking/web\"",
+    "dev": "npm run build:shared && concurrently -k -n shared,api,web -c gray,cyan,magenta \"npm run dev -w @booking/shared -- --preserveWatchOutput\" \"npm run dev -w @booking/api\" \"npm run dev -w @booking/web\"",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:generate": "npm run db:generate -w @booking/api",
+    "db:migrate": "npm run db:migrate -w @booking/api",
+    "db:deploy": "npm run db:deploy -w @booking/api",
+    "db:seed": "npm run db:seed -w @booking/api",
+    "db:studio": "npm run db:studio -w @booking/api"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}
