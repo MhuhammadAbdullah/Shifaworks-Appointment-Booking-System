@@ -76,6 +76,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
       message: appError.message,
       code: appError.code,
       ...(appError.errors?.length ? { errors: appError.errors } : {}),
+      ...(appError.details ? { details: appError.details } : {}),
       ...(requestId ? { requestId } : {}),
     };
     res.status(appError.statusCode).json(body);

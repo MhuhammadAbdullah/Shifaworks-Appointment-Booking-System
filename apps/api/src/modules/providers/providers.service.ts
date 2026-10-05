@@ -185,6 +185,8 @@ async function applyUpdate(principal: Principal, id: string, input: UpdateProvid
     await recordAudit(tx, ctx, { action, entityType: "provider", entityId: id, oldValues: toDto(before), newValues: input });
     return loadProvider(tx, orgId, id);
   });
+  // The cached Principal mirrors the profile photo (top-right avatar) — drop it so a photo change shows up right away.
+  if (row.user) invalidatePrincipal(row.user.id);
   return toDto(row);
 }
 

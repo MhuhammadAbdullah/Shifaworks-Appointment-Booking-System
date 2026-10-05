@@ -25,7 +25,9 @@ import { formatMoney } from "@/lib/format";
 const errorText = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 const TABS = ["ALL", ...INVOICE_STATUSES] as const;
 const TAB_LABELS: Record<(typeof TABS)[number], string> = { ALL: "All", ...INVOICE_STATUS_LABELS };
-const isVoidable = (inv: InvoiceDto) => inv.status !== "VOID" && Number(inv.amountPaid) === 0;
+// A pay slip's "amountPaid" is the payout itself (set the moment it's issued), not a customer
+// payment to refund first — so it stays voidable regardless, unlike a customer invoice.
+const isVoidable = (inv: InvoiceDto) => inv.status !== "VOID" && (inv.audience === "PROVIDER" || Number(inv.amountPaid) === 0);
 
 export default function InvoicesPage() {
   return (

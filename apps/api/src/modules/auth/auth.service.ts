@@ -22,6 +22,7 @@ export function toMeResponse(p: Principal): MeResponse {
     staffProfileId: p.staffProfileId,
     providerProfileId: p.providerProfileId,
     providerType: p.providerType,
+    avatarUrl: p.avatarUrl,
   };
 }
 

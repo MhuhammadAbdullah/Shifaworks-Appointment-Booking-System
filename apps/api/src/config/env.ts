@@ -38,11 +38,13 @@ const EnvSchema = z.object({
   SUPABASE_JWT_AUDIENCE: z.string().default("authenticated"),
   // Only needed for projects still on the legacy HS256 shared JWT secret.
   SUPABASE_JWT_SECRET: z.string().optional(),
-  STORAGE_PUBLIC_BUCKET: z.string().default("public-media"),
-  STORAGE_PRIVATE_BUCKET: z.string().default("private-files"),
-  STORAGE_ARCHIVE_BUCKET: z.string().default("log-archives"),
+  // File/image storage (provider photos, payment proofs, expense receipts, log archives).
+  CLOUDINARY_CLOUD_NAME: z.string().min(1),
+  CLOUDINARY_API_KEY: z.string().min(1),
+  // Server-only secret. Never sent to the browser.
+  CLOUDINARY_API_SECRET: z.string().min(1),
   MAX_UPLOAD_MB: z.coerce.number().positive().default(10),
-  // Audit logs / email logs older than this are exported to CSV in STORAGE_ARCHIVE_BUCKET and deleted weekly.
+  // Audit logs / email logs older than this are exported to CSV (in Cloudinary) and deleted weekly.
   LOG_ARCHIVE_RETENTION_DAYS: z.coerce.number().int().positive().default(14),
 
   REDIS_URL: z.string().optional(),

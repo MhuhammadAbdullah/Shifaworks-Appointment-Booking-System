@@ -3,15 +3,22 @@ import type { PermissionKey } from "@booking/shared";
 import { AppError } from "../utils/app-error.js";
 import { verifyAccessToken, type VerifiedToken } from "../modules/auth/token-verifier.js";
 import { resolvePrincipal, type Principal } from "../modules/auth/principal.service.js";
+import { isRecoveryLocked } from "../modules/auth/recovery-lock.js";
 import { hasPermission } from "../modules/auth/permission-rules.js";
 
 declare global {
   namespace Express {
     interface Request {
       principal?: Principal;
+      /** Supabase's session_id claim — set whenever a bearer token verifies, even if recovery-locked. */
+      sessionId?: string | null;
     }
   }
 }
+
+// A recovery-locked session may only identify itself and finish setting a password —
+// everything else (every real feature) is off-limits until that's confirmed.
+const RECOVERY_ALLOWED_PATHS = new Set(["/api/v1/auth/me", "/api/v1/auth/logout", "/api/v1/auth/confirm-recovery"]);
 
 export type TokenVerifier = (token: string) => Promise<VerifiedToken>;
 export type PrincipalResolver = (token: VerifiedToken) => Promise<Principal>;
@@ -41,7 +48,12 @@ export function createAuthenticate(
       return;
     }
     try {
-      req.principal = await resolve(await verify(token));
+      const verified = await verify(token);
+      req.sessionId = verified.sessionId;
+      if (isRecoveryLocked(verified) && !RECOVERY_ALLOWED_PATHS.has(req.originalUrl.split("?")[0]!)) {
+        throw new AppError("FORBIDDEN", "Please finish setting your new password before continuing.", undefined, { reason: "recovery_locked" });
+      }
+      req.principal = await resolve(verified);
     } catch (err) {
       if (err instanceof AppError && (err.code === "UNAUTHENTICATED" || err.code === "FORBIDDEN")) {
         req.log.warn({ code: err.code, reason: err.message, ip: req.ip }, "authentication failed");

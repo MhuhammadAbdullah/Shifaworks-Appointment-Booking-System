@@ -52,6 +52,7 @@ function principal(permissions: readonly PermissionKey[], over: Partial<Principa
     staffProfileId: "staff",
     providerProfileId: null,
     providerType: null,
+    avatarUrl: null,
     ...over,
   };
 }

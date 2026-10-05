@@ -44,6 +44,7 @@ function principal(permissions: readonly PermissionKey[], over: Partial<Principa
     staffProfileId: null,
     providerProfileId: null,
     providerType: null,
+    avatarUrl: null,
     ...over,
   };
 }
@@ -74,7 +75,7 @@ async function makeUser(opts: { roles?: string[]; status?: "ACTIVE" | "SUSPENDED
   return user;
 }
 
-const token = (sub: string) => ({ sub, email: null, sessionId: null, payload: {} });
+const token = (sub: string) => ({ sub, email: null, sessionId: null, authMethod: "password", payload: {} });
 
 beforeAll(async () => {
   const o = await prisma.organization.findUniqueOrThrow({

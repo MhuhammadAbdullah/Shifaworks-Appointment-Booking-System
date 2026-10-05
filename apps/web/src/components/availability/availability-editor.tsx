@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   AVAILABILITY_EXCEPTION_TYPES,
@@ -39,6 +39,11 @@ import { cn } from "@/lib/utils";
 const errorText = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 const ALL_SERVICES = "all";
 type ProviderService = ProviderDto["services"][number];
+
+function intervalsEqual(a: TimeInterval[] | undefined, b: TimeInterval[] | undefined): boolean {
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((iv, i) => iv.start === b[i]!.start && iv.end === b[i]!.end);
+}
 
 function validIntervals(list: TimeInterval[]): string | null {
   const sorted = [...list].sort((a, b) => hhmmToMinutes(a.start) - hhmmToMinutes(b.start));
@@ -143,6 +148,9 @@ function CustomHoursCalendarCard({
   const [cursor, setCursor] = useState<Cursor>({ year: Number(today.slice(0, 4)), month: Number(today.slice(5, 7)) - 1 });
   const [selected, setSelected] = useState<string[]>([]);
   const [drafts, setDrafts] = useState<Map<string, TimeInterval[]>>(new Map());
+  // Dates already saved on the server start locked (read-only) — "Edit" unlocks one at a time,
+  // so a stray click can never silently change or delete hours someone already set.
+  const [editing, setEditing] = useState<Set<string>>(new Set());
   const scopedServiceName = services.find((s) => s.id === selectedServiceId)?.name;
 
   // Provider-wide overrides (serviceId null) always apply; a service-scoped one only when it's the one being viewed.
@@ -160,31 +168,66 @@ function CustomHoursCalendarCard({
     }
   }
 
-  // Every date with custom hours already set shows beside the calendar by default, editable right away —
-  // not just dates freshly clicked this session.
+  // Every date with custom hours already set shows beside the calendar by default, locked (read-only)
+  // until "Edit" unlocks it — not just dates freshly clicked this session.
   useEffect(() => {
     const dates = [...customByDate.keys()].sort();
     setSelected(dates);
     setDrafts(new Map(dates.map((d) => [d, customByDate.get(d)!.map((iv) => ({ ...iv }))])));
+    setEditing(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reseed only when the server data or scope changes, not on every local edit
   }, [availability, selectedServiceId]);
 
-  function removeDate(date: string) {
-    if (readOnly) return;
-    const id = exceptionIdByDate.get(date);
+  const isLocked = (date: string) => customByDate.has(date) && !editing.has(date);
+  // What Save actually sends: brand-new dates, plus locked-then-edited ones whose hours really changed.
+  // This stays scoped to every selected date, even ones from a month you've since scrolled away from,
+  // so switching months never silently drops a pending edit from being saved.
+  const dirtyDates = selected.filter((d) => !customByDate.has(d) || (editing.has(d) && !intervalsEqual(drafts.get(d), customByDate.get(d))));
+  // The list beside the calendar only shows the month currently in view — selections elsewhere are
+  // kept (and still saved), just not cluttering the list while you're looking at a different month.
+  const monthPrefix = `${cursor.year}-${pad2(cursor.month + 1)}-`;
+  const visibleSelected = selected.filter((d) => d.startsWith(monthPrefix));
+
+  /** Drops a date that was only ever a local selection — nothing saved, nothing to confirm. */
+  function dropUnsaved(date: string) {
     setSelected((prev) => prev.filter((d) => d !== date));
     setDrafts((m) => {
       const next = new Map(m);
       next.delete(date);
       return next;
     });
-    if (id) remove.mutate(id, { onError: (e) => toast.error(errorText(e, "Could not remove")) });
+  }
+
+  /** The only way a saved date's hours are removed now — a deliberate click, confirmed, never a stray calendar tap. */
+  function deleteSaved(date: string) {
+    if (readOnly) return;
+    const id = exceptionIdByDate.get(date);
+    if (!id) return;
+    if (!window.confirm(`Remove the custom hours for ${date}? This cannot be undone.`)) return;
+    remove.mutate(id, { onError: (e) => toast.error(errorText(e, "Could not remove")) });
+  }
+
+  function startEditing(date: string) {
+    if (readOnly) return;
+    setEditing((s) => new Set(s).add(date));
+  }
+
+  /** Discards an in-progress edit, reverting that date's draft back to its saved hours. */
+  function cancelEditing(date: string) {
+    setEditing((s) => {
+      if (!s.has(date)) return s;
+      const next = new Set(s);
+      next.delete(date);
+      return next;
+    });
+    setDrafts((m) => new Map(m).set(date, (customByDate.get(date) ?? []).map((iv) => ({ ...iv }))));
   }
 
   function toggleDate(date: string) {
     if (readOnly) return;
     if (selected.includes(date)) {
-      removeDate(date);
+      if (isLocked(date)) return; // already saved — removing it now goes through the Delete icon below, never a calendar click
+      dropUnsaved(date);
       return;
     }
     setDrafts((m) => new Map(m).set(date, customByDate.get(date) ?? defaultInterval.map((iv) => ({ ...iv }))));
@@ -208,38 +251,45 @@ function CustomHoursCalendarCard({
   }
 
   function applyFirstToAll() {
-    const first = selected[0];
+    const first = visibleSelected[0];
     if (!first) return;
     const template = drafts.get(first);
     if (!template) return;
     setDrafts((m) => {
       const next = new Map(m);
-      for (const d of selected) next.set(d, template.map((iv) => ({ ...iv })));
+      for (const d of visibleSelected) if (d !== first) next.set(d, template.map((iv) => ({ ...iv })));
+      return next;
+    });
+    // Copying hours onto an already-saved date is itself an edit — unlock it so Save picks it up.
+    setEditing((s) => {
+      const next = new Set(s);
+      for (const d of visibleSelected) if (d !== first && customByDate.has(d)) next.add(d);
       return next;
     });
   }
 
+  /** Discards every pending change: drops not-yet-saved dates, reverts any in-progress edits. Never touches what's already saved. */
   function clearSelection() {
-    setSelected([]);
-    setDrafts(new Map());
+    setSelected((prev) => prev.filter((d) => customByDate.has(d)));
+    setDrafts(new Map([...customByDate.entries()].map(([d, ivs]) => [d, ivs.map((iv) => ({ ...iv }))])));
+    setEditing(new Set());
   }
 
   function submit() {
     const items: CreateExceptionInput[] = [];
-    for (const date of selected) {
+    for (const date of dirtyDates) {
       const intervals = drafts.get(date) ?? [];
       const problem = validIntervals(intervals);
       if (problem) return toast.error(`${date}: ${problem}`);
       items.push({ type: "CUSTOM_HOURS", ...(selectedServiceId ? { serviceId: selectedServiceId } : {}), startDate: date, endDate: date, intervals });
     }
-    if (items.length === 0) return toast.error("Select at least one date");
+    if (items.length === 0) return toast.error("Nothing to save");
     bulkAdd.mutate(
       { items },
       {
-        onSuccess: () => {
-          toast.success(`${items.length} date${items.length === 1 ? "" : "s"} saved`);
-          clearSelection();
-        },
+        // The reseed effect (above) picks up the fresh server state once this resolves — newly
+        // saved dates lock themselves, no need to touch local state here.
+        onSuccess: () => toast.success(`${items.length} date${items.length === 1 ? "" : "s"} saved`),
         onError: (e) => toast.error(errorText(e, "Could not save")),
       },
     );
@@ -323,38 +373,62 @@ function CustomHoursCalendarCard({
                 <Button type="button" variant="ghost" size="sm" onClick={selectWholeMonth}>
                   Select whole month
                 </Button>
-                {selected.length > 0 && (
+                {(dirtyDates.length > 0 || editing.size > 0) && (
                   <Button type="button" variant="ghost" size="sm" onClick={clearSelection}>
-                    Clear selection
+                    Discard changes
                   </Button>
                 )}
               </div>
             )}
           </div>
 
-          {selected.length > 0 && (
+          {visibleSelected.length > 0 && (
             <div className="grid w-full gap-3 rounded-md bg-muted/50 p-3 lg:max-h-[26rem] lg:flex-1 lg:overflow-y-auto">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium">
-                  {selected.length} date{selected.length === 1 ? "" : "s"} selected
+                  {visibleSelected.length} date{visibleSelected.length === 1 ? "" : "s"} selected
                 </p>
-                {!readOnly && selected.length > 1 && (
+                {!readOnly && visibleSelected.length > 1 && (
                   <Button type="button" variant="ghost" size="sm" onClick={applyFirstToAll}>
-                    Use {selected[0]}&apos;s hours for all
+                    Use {visibleSelected[0]}&apos;s hours for all
                   </Button>
                 )}
               </div>
               <div className="grid gap-3">
-                {selected.map((date) => {
+                {visibleSelected.map((date) => {
                   const intervals = drafts.get(date) ?? [];
+                  const locked = isLocked(date);
+                  const isNew = !customByDate.has(date);
                   return (
                     <div key={date} className="grid gap-1.5 border-b pb-2 last:border-0">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">{date}</span>
+                        <span className="text-sm font-medium">
+                          {date}
+                          {locked && <span className="ml-2 text-xs font-normal text-muted-foreground">Saved</span>}
+                        </span>
                         {!readOnly && (
-                          <Button type="button" variant="ghost" size="icon" aria-label={`Remove ${date}`} onClick={() => removeDate(date)}>
-                            <X className="size-4" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            {isNew && (
+                              <Button type="button" variant="ghost" size="icon" aria-label={`Remove ${date}`} onClick={() => dropUnsaved(date)}>
+                                <X className="size-4" />
+                              </Button>
+                            )}
+                            {!isNew && locked && (
+                              <>
+                                <Button type="button" variant="ghost" size="icon" aria-label={`Edit ${date}`} onClick={() => startEditing(date)}>
+                                  <Pencil className="size-4" />
+                                </Button>
+                                <Button type="button" variant="ghost" size="icon" aria-label={`Delete ${date}`} onClick={() => deleteSaved(date)}>
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </>
+                            )}
+                            {!isNew && !locked && (
+                              <Button type="button" variant="ghost" size="icon" aria-label={`Cancel editing ${date}`} onClick={() => cancelEditing(date)}>
+                                <X className="size-4" />
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </div>
                       {intervals.map((iv, i) => (
@@ -363,7 +437,7 @@ function CustomHoursCalendarCard({
                             type="time"
                             aria-label={`${date} start ${i + 1}`}
                             className="w-32"
-                            disabled={readOnly}
+                            disabled={readOnly || locked}
                             value={iv.start}
                             onChange={(e) => setDraft(date, intervals.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)))}
                           />
@@ -372,18 +446,18 @@ function CustomHoursCalendarCard({
                             type="time"
                             aria-label={`${date} end ${i + 1}`}
                             className="w-32"
-                            disabled={readOnly}
+                            disabled={readOnly || locked}
                             value={iv.end}
                             onChange={(e) => setDraft(date, intervals.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)))}
                           />
-                          {!readOnly && intervals.length > 1 && (
+                          {!readOnly && !locked && intervals.length > 1 && (
                             <Button type="button" variant="ghost" size="icon" aria-label="Remove range" onClick={() => setDraft(date, intervals.filter((_, j) => j !== i))}>
                               <X className="size-4" />
                             </Button>
                           )}
                         </div>
                       ))}
-                      {!readOnly && (
+                      {!readOnly && !locked && (
                         <Button
                           type="button"
                           variant="ghost"
@@ -404,8 +478,12 @@ function CustomHoursCalendarCard({
       </CardContent>
       {!readOnly && selected.length > 0 && (
         <CardFooter className="justify-end">
-          <Button onClick={submit} disabled={bulkAdd.isPending}>
-            {bulkAdd.isPending ? "Saving…" : `Save ${selected.length} date${selected.length === 1 ? "" : "s"}`}
+          <Button onClick={submit} disabled={bulkAdd.isPending || dirtyDates.length === 0}>
+            {bulkAdd.isPending
+              ? "Saving…"
+              : dirtyDates.length === 0
+                ? "Saved"
+                : `Save Date${dirtyDates.length === 1 ? "" : "s"}`}
           </Button>
         </CardFooter>
       )}

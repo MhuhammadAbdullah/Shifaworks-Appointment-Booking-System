@@ -9,26 +9,18 @@ import { randomUUID } from "node:crypto";
 import { env } from "../config/env.js";
 import { logger } from "../config/logger.js";
 import { prisma } from "../lib/prisma.js";
-import { supabaseAdmin } from "../lib/supabase.js";
+import { uploadBuffer } from "../lib/cloudinary.js";
 import { toCsv } from "../utils/csv.js";
-import { ensureBucket } from "../modules/files/files.service.js";
 
 const BATCH_SIZE = 5_000;
 const MAX_ROUNDS = 20; // per table, per run — well above one week's worth of normal traffic
 
-let bucketReady = false;
-async function ensureArchiveBucket(): Promise<void> {
-  if (bucketReady) return;
-  await ensureBucket(env.STORAGE_ARCHIVE_BUCKET, { public: false, maxMb: 20, mimeTypes: ["text/csv"] });
-  bucketReady = true;
-}
-
 async function upload(path: string, csv: string): Promise<void> {
-  const { error } = await supabaseAdmin.storage.from(env.STORAGE_ARCHIVE_BUCKET).upload(path, Buffer.from(csv, "utf-8"), {
-    contentType: "text/csv",
-    upsert: false,
-  });
-  if (error) throw new Error(`archive upload failed for ${path}: ${error.message}`);
+  try {
+    await uploadBuffer(Buffer.from(csv, "utf-8"), path, { resourceType: "raw", type: "authenticated" });
+  } catch (err) {
+    throw new Error(`archive upload failed for ${path}: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 const json = (v: unknown) => (v === null || v === undefined ? "" : JSON.stringify(v));
@@ -72,7 +64,6 @@ async function archiveEmailLogs(cutoff: Date, now: Date): Promise<number> {
 /** Runs both archive sweeps. Safe to call repeatedly — a no-op once nothing is older than the retention window. */
 export async function archiveOldLogs(now = new Date()): Promise<{ auditLogs: number; emailLogs: number }> {
   const cutoff = new Date(now.getTime() - env.LOG_ARCHIVE_RETENTION_DAYS * 24 * 60 * 60 * 1000);
-  await ensureArchiveBucket();
   const auditLogs = await archiveAuditLogs(cutoff, now);
   const emailLogs = await archiveEmailLogs(cutoff, now);
   if (auditLogs || emailLogs) logger.info({ auditLogs, emailLogs, cutoff }, "log archive sweep completed");

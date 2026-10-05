@@ -1,8 +1,10 @@
 import PDFDocument from "pdfkit";
 import type { Writable } from "node:stream";
 import { PAYMENT_METHOD_LABELS, PROVIDER_TYPE_LABELS } from "@booking/shared";
+import { logger } from "../../config/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import { getOrgSettings } from "../../lib/settings.js";
+import { fileUrlSelect, publicFileUrl } from "../files/files.service.js";
 import type { InvoiceRow } from "./invoices.service.js";
 
 const fmt = (currency: string) => (v: { toFixed(n: number): string } | string) =>
@@ -11,7 +13,7 @@ const fmt = (currency: string) => (v: { toFixed(n: number): string } | string) =
 /** Renders an A4 invoice PDF into `out` (e.g. the HTTP response). Uses PDF core fonts only. */
 export async function renderInvoicePdf(inv: InvoiceRow, organizationId: string, out: Writable): Promise<void> {
   const [org, settings] = await Promise.all([
-    prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { name: true, email: true, phone: true, website: true } }),
+    prisma.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { name: true, email: true, phone: true, website: true, logo: fileUrlSelect } }),
     getOrgSettings(organizationId),
   ]);
   const footer = settings.invoiceFooter;
@@ -23,11 +25,24 @@ export async function renderInvoicePdf(inv: InvoiceRow, organizationId: string, 
   const left = 50;
   const right = 545;
 
-  // Header
-  doc.fontSize(18).font("Helvetica-Bold").fillColor("#111827").text(org.name, left, 50);
+  // Header — logo (if one is set in Settings) to the left, name/contact beside it.
+  let textLeft = left;
+  const logoUrl = publicFileUrl(org.logo);
+  if (logoUrl) {
+    try {
+      const res = await fetch(logoUrl);
+      if (res.ok) {
+        doc.image(Buffer.from(await res.arrayBuffer()), left, 45, { fit: [50, 50] });
+        textLeft = left + 62;
+      }
+    } catch (err) {
+      logger.warn({ err }, "could not embed organisation logo in invoice PDF");
+    }
+  }
+  doc.fontSize(18).font("Helvetica-Bold").fillColor("#111827").text(org.name, textLeft, 50);
   doc.fontSize(9).font("Helvetica").fillColor(muted);
   const orgLines = [[org.phone, org.email].filter(Boolean).join(" · "), org.website].filter(Boolean) as string[];
-  for (const l of orgLines) doc.text(l);
+  for (const l of orgLines) doc.text(l, textLeft);
 
   const isPayslip = inv.audience === "PROVIDER";
   const docTitle = isPayslip ? "PAY SLIP" : "INVOICE";
@@ -60,12 +75,13 @@ export async function renderInvoicePdf(inv: InvoiceRow, organizationId: string, 
     for (const l of [inv.customer.customerNumber, inv.customer.email, inv.customer.phone].filter(Boolean) as string[]) doc.text(l);
   }
 
-  // Items table
+  // Items table — no Qty column: every line is one service/charge, never a product count.
   y = doc.y + 20;
-  const cols = { desc: left, qty: 320, price: 360, tax: 430, total: 480 };
+  const descWidth = 300;
+  const cols = { desc: left, price: 360, tax: 430, total: 480 };
   doc.rect(left, y, right - left, 20).fill("#f3f4f6");
   doc.fontSize(9).font("Helvetica-Bold").fillColor("#111827");
-  doc.text("Description", cols.desc + 6, y + 6).text("Qty", cols.qty, y + 6, { width: 35, align: "right" });
+  doc.text("Description", cols.desc + 6, y + 6);
   doc.text("Price", cols.price, y + 6, { width: 65, align: "right" }).text("Tax", cols.tax, y + 6, { width: 45, align: "right" });
   doc.text("Amount", cols.total, y + 6, { width: right - cols.total - 6, align: "right" });
   y += 26;
@@ -75,15 +91,14 @@ export async function renderInvoicePdf(inv: InvoiceRow, organizationId: string, 
       doc.addPage();
       y = 50;
     }
-    const h = Math.max(doc.heightOfString(it.description, { width: 260 }), 12);
-    doc.fillColor("#111827").text(it.description, cols.desc + 6, y, { width: 260 });
-    doc.text(it.quantity.toFixed(2).replace(/\.00$/, ""), cols.qty, y, { width: 35, align: "right" });
+    const h = Math.max(doc.heightOfString(it.description, { width: descWidth }), 12);
+    doc.fillColor("#111827").text(it.description, cols.desc + 6, y, { width: descWidth });
     doc.text(it.unitPrice.toFixed(2), cols.price, y, { width: 65, align: "right" });
     doc.text(it.taxAmount.gt(0) ? it.taxAmount.toFixed(2) : "-", cols.tax, y, { width: 45, align: "right" });
     doc.text(it.totalAmount.toFixed(2), cols.total, y, { width: right - cols.total - 6, align: "right" });
     y += h + 8;
     if (it.discountAmount.gt(0)) {
-      doc.fillColor(muted).text(`Discount −${it.discountAmount.toFixed(2)}`, cols.desc + 6, y - 6, { width: 260 });
+      doc.fillColor(muted).text(`Discount −${it.discountAmount.toFixed(2)}`, cols.desc + 6, y - 6, { width: descWidth });
       y += 8;
     }
     doc.moveTo(left, y - 3).lineTo(right, y - 3).strokeColor("#e5e7eb").stroke();

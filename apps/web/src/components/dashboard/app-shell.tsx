@@ -322,9 +322,14 @@ export function AppShell({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2 px-2">
-                  <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-                    {initials(me)}
-                  </span>
+                  {me.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- Supabase public URL
+                    <img src={me.avatarUrl} alt="" className="size-8 shrink-0 rounded-full object-cover" />
+                  ) : (
+                    <span className="flex size-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                      {initials(me)}
+                    </span>
+                  )}
                   <span className="hidden text-sm sm:inline">{me.user.firstName}</span>
                 </Button>
               </DropdownMenuTrigger>
@@ -336,11 +341,13 @@ export function AppShell({
                   <div className="truncate text-xs text-muted-foreground">{me.user.email}</div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/account/profile">
-                    <UserRound className="size-4" /> Profile
-                  </Link>
-                </DropdownMenuItem>
+                {area !== "provider" && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/account/profile">
+                      <UserRound className="size-4" /> Profile
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onSelect={() => void signOut()}>
                   <LogOut className="size-4" /> Sign out
                 </DropdownMenuItem>

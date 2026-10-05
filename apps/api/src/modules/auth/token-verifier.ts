@@ -14,7 +14,20 @@ export interface VerifiedToken {
   sub: string;
   email: string | null;
   sessionId: string | null;
+  /** How this specific session was established (Supabase's `amr` claim) — "password", "recovery", "otp", … */
+  authMethod: string | null;
   payload: JWTPayload;
+}
+
+/** The most recent entry in Supabase's `amr` (authentication method reference) claim, if any. */
+function lastAuthMethod(payload: JWTPayload): string | null {
+  const amr = payload["amr"];
+  if (!Array.isArray(amr) || amr.length === 0) return null;
+  const last = amr[amr.length - 1] as unknown;
+  if (last && typeof last === "object" && typeof (last as Record<string, unknown>)["method"] === "string") {
+    return (last as Record<string, unknown>)["method"] as string;
+  }
+  return null;
 }
 
 export interface TokenVerifierOptions {
@@ -69,6 +82,7 @@ export function createTokenVerifier(opts: TokenVerifierOptions) {
       sub: payload.sub,
       email: typeof payload["email"] === "string" && payload["email"] ? payload["email"].toLowerCase() : null,
       sessionId: typeof payload["session_id"] === "string" ? payload["session_id"] : null,
+      authMethod: lastAuthMethod(payload),
       payload,
     };
   };

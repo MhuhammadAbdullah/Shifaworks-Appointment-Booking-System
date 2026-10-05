@@ -76,6 +76,7 @@ function principal(permissions: readonly PermissionKey[]): Principal {
     staffProfileId: "staff",
     providerProfileId: null,
     providerType: null,
+    avatarUrl: null,
   };
 }
 const admin = () => principal(ALL_PERMISSIONS.filter((p) => p !== "roles.manage"));

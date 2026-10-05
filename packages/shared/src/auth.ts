@@ -38,6 +38,8 @@ export interface MeResponse {
   staffProfileId: string | null;
   providerProfileId: string | null;
   providerType: ProviderType | null;
+  /** The provider's own profile photo, if they have one set — null for staff (no avatar upload yet). */
+  avatarUrl: string | null;
 }
 
 export interface RoleSummary {

@@ -39,9 +39,9 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Reset your password</CardTitle>
+    <Card className="border-muted gap-8 py-8 shadow-md">
+      <CardHeader className="text-center">
+        <CardTitle className="text-2xl">Reset your password</CardTitle>
         <CardDescription>We&apos;ll email you a link to choose a new password.</CardDescription>
       </CardHeader>
       <form onSubmit={onSubmit} noValidate>
@@ -50,7 +50,7 @@ export default function ForgotPasswordPage() {
             <Input type="email" autoComplete="email" {...fieldA11y("email", errors.email?.message)} {...form.register("email")} />
           </Field>
         </CardContent>
-        <CardFooter className="mt-4 flex flex-col gap-3">
+        <CardFooter className="mt-2 flex flex-col gap-3">
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? "Sending…" : "Send reset link"}
           </Button>

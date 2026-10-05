@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
-import { publicEnv } from "@/lib/env";
 
 /**
  * There is deliberately no service listing here: customers discover services
  * on shifaworks.com and arrive directly at a service URL (/hijama-therapy, …).
- * Anyone opening the bare domain is sent back to the main website.
+ * Anyone opening the bare domain (staff bookmarking it, a stray link) lands on
+ * sign-in instead of being bounced off this app entirely.
  */
 export default function HomePage() {
-  redirect(publicEnv.NEXT_PUBLIC_WEBSITE_URL);
+  redirect("/login");
 }

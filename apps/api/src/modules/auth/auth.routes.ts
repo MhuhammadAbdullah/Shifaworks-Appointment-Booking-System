@@ -15,3 +15,4 @@ authRouter.use(requireAuth);
 authRouter.get("/me", controller.getMe);
 authRouter.patch("/me", validate({ body: updateMeSchema }), controller.updateMe);
 authRouter.post("/logout", controller.logout);
+authRouter.post("/confirm-recovery", controller.confirmRecovery);

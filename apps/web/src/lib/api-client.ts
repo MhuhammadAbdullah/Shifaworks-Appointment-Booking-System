@@ -8,6 +8,7 @@ export class ApiError extends Error {
     message: string,
     readonly errors: ApiFieldError[] = [],
     readonly requestId?: string,
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = "ApiError";
@@ -82,6 +83,7 @@ export async function apiRequest<T>(path: string, opts: RequestOptions = {}): Pr
       failure?.message ?? `Request failed with status ${res.status}`,
       failure?.errors ?? [],
       failure?.requestId,
+      failure?.details,
     );
   }
   return { data: payload.data, meta: payload.meta, message: payload.message };

@@ -308,14 +308,15 @@ export async function createPayslip(p: Principal, input: CreatePayslipInput, ctx
         invoiceNumber: await nextDocumentNumber(tx, p.organizationId, "PSL", DateTime.now().setZone(tz).year),
         audience: "PROVIDER",
         providerId: input.providerId,
-        status: input.issue ? "ISSUED" : "DRAFT",
+        // Same "issuing a pay slip = recording the payout" rule as issueInvoice: no ISSUED-but-unpaid state for these.
+        status: input.issue ? "PAID" : "DRAFT",
         currency: p.organization.currency,
         subtotal: amount,
         discountAmount: 0,
         taxAmount: 0,
         totalAmount: amount,
-        amountPaid: 0,
-        amountDue: amount,
+        amountPaid: input.issue ? amount : 0,
+        amountDue: input.issue ? 0 : amount,
         issueDate: parseDateOnly(issueDate),
         dueDate: input.dueDate
           ? parseDateOnly(input.dueDate)
@@ -351,9 +352,21 @@ export async function issueInvoice(p: Principal, id: string, ctx: AuditContext):
   await prisma.$transaction(async (tx) => {
     const inv = await loadInvoice(tx, p, id);
     if (inv.status !== "DRAFT") throw AppError.badRequest("Only draft invoices can be issued");
-    await tx.invoice.update({ where: { id }, data: { status: "ISSUED", issuedAt: new Date(), issueDate: parseDateOnly(today(p.organization.timezone)) } });
-    await recomputeInvoice(tx, id);
-    if (inv.audience === "PROVIDER" && inv.provider) {
+    // A pay slip has no separate "awaiting payment" step — issuing it *is* recording the payout
+    // (the ledger entry below posts the same moment), so it goes straight to PAID. A customer
+    // invoice's status instead tracks real Payment rows via recomputeInvoice — never set by hand.
+    const isPayslip = inv.audience === "PROVIDER";
+    await tx.invoice.update({
+      where: { id },
+      data: {
+        status: isPayslip ? "PAID" : "ISSUED",
+        issuedAt: new Date(),
+        issueDate: parseDateOnly(today(p.organization.timezone)),
+        ...(isPayslip ? { amountPaid: inv.totalAmount, amountDue: ZERO } : {}),
+      },
+    });
+    if (!isPayslip) await recomputeInvoice(tx, id);
+    if (isPayslip && inv.provider) {
       await postPayslipLedgerEntry(tx, p, { invoiceNumber: inv.invoiceNumber, amount: inv.totalAmount, currency: inv.currency, providerName: inv.provider.displayName });
     }
     await recordAudit(tx, ctx, { action: "invoice.issue", entityType: "invoice", entityId: id });

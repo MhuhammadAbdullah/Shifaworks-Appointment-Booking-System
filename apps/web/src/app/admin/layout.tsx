@@ -58,6 +58,7 @@ const nav: NavItem[] = [
     icon: BellRing,
     anyOf: ["notifications.view", "notifications.manage_templates"],
     exact: true,
+    expandOnly: true,
     children: [
       { href: "/admin/notifications", label: "Email log", anyOf: ["notifications.view"], exact: true },
       { href: "/admin/notifications/templates", label: "Templates", anyOf: ["notifications.manage_templates", "notifications.view"] },

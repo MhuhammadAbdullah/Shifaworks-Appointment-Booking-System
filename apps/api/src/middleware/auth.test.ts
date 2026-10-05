@@ -29,6 +29,7 @@ function principal(permissions: PermissionKey[], overrides: Partial<Principal> =
     staffProfileId: null,
     providerProfileId: null,
     providerType: null,
+    avatarUrl: null,
     ...overrides,
   };
 }
@@ -38,7 +39,7 @@ function buildApp() {
   const { requireAuth, authenticate } = createAuthenticate(
     async (token) => {
       if (token.startsWith("good:") || token === "super" || token === "disabled") {
-        return { sub: token, email: null, sessionId: null, payload: {} };
+        return { sub: token, email: null, sessionId: null, authMethod: "password", payload: {} };
       }
       throw AppError.unauthenticated("Invalid access token");
     },

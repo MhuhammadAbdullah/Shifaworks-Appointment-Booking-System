@@ -59,44 +59,48 @@ export function LoginForm() {
   });
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Sign in</CardTitle>
+    <Card className="border-muted gap-8 py-8 shadow-md">
+      <CardHeader className="text-center">
+        <CardTitle className="text-2xl">Sign in</CardTitle>
         <CardDescription>For ShifaWorks staff, therapists and counsellors.</CardDescription>
       </CardHeader>
       <form onSubmit={onSubmit} noValidate>
-        <CardContent className="grid gap-4">
+        <CardContent className="grid gap-5">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <Field id="email" label="Email" error={errors.email?.message}>
-            <Input type="email" autoComplete="email" {...fieldA11y("email", errors.email?.message)} {...form.register("email")} />
-          </Field>
-          <Field id="password" label="Password" error={errors.password?.message}>
-            <PasswordInput
-              autoComplete="current-password"
-              {...fieldA11y("password", errors.password?.message)}
-              {...form.register("password")}
-            />
-          </Field>
-          <Link href="/forgot-password" className="justify-self-end text-sm text-muted-foreground hover:underline">
-            Forgot password?
-          </Link>
-        </CardContent>
-        <CardFooter className="mt-4 flex flex-col gap-3">
+          <div className="grid gap-4">
+            <Field id="email" label="Email" error={errors.email?.message}>
+              <Input type="email" autoComplete="email" {...fieldA11y("email", errors.email?.message)} {...form.register("email")} />
+            </Field>
+            <div className="grid gap-1.5">
+              <Field id="password" label="Password" error={errors.password?.message}>
+                <PasswordInput
+                  autoComplete="current-password"
+                  {...fieldA11y("password", errors.password?.message)}
+                  {...form.register("password")}
+                />
+              </Field>
+              <Link href="/forgot-password" className="justify-self-end text-sm text-muted-foreground hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+          </div>
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? "Signing in…" : "Sign in"}
           </Button>
-          <p className="text-center text-sm text-muted-foreground">
-            Accounts are created by invitation. Looking to book a session?{" "}
-            <a href={publicEnv.NEXT_PUBLIC_WEBSITE_URL} className="font-medium text-foreground hover:underline">
-              Visit shifaworks.com
-            </a>
-          </p>
-        </CardFooter>
+        </CardContent>
       </form>
+      <CardFooter className="flex-col gap-1">
+        <p className="text-center text-sm text-muted-foreground">
+          Accounts are created by invitation. Looking to book a session?{" "}
+          <a href={publicEnv.NEXT_PUBLIC_WEBSITE_URL} className="font-medium text-foreground hover:underline">
+            Visit shifaworks.com
+          </a>
+        </p>
+      </CardFooter>
     </Card>
   );
 }

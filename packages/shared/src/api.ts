@@ -28,6 +28,8 @@ export interface ApiFailure {
   code: ErrorCode;
   errors?: ApiFieldError[];
   requestId?: string;
+  /** Machine-readable extras for a specific error (e.g. `{ reason: "recovery_locked" }`) — the frontend may branch on these, never just display them. */
+  details?: Record<string, unknown>;
 }
 
 export type ApiResponse<T> = ApiSuccess<T> | ApiFailure;

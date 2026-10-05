@@ -44,6 +44,7 @@ function principal(userId: string, permissions: readonly PermissionKey[], isSupe
     staffProfileId: "staff",
     providerProfileId: null,
     providerType: null,
+    avatarUrl: null,
   };
 }
 const admin = () => principal(actorId, ALL_PERMISSIONS.filter((p) => p !== "roles.manage"));

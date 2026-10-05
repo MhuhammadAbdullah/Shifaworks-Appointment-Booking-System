@@ -26,6 +26,7 @@ export interface Principal {
   staffProfileId: string | null;
   providerProfileId: string | null;
   providerType: ProviderType | null;
+  avatarUrl: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,7 +85,7 @@ const principalInclude = {
   },
   userPermissions: { select: { granted: true, permission: { select: { key: true } } } },
   staffProfile: { select: { id: true } },
-  providerProfile: { select: { id: true, providerType: true } },
+  providerProfile: { select: { id: true, providerType: true, profileImage: fileUrlSelect } },
 } as const;
 
 async function findUserByAuthId(authUserId: string) {
@@ -125,6 +126,7 @@ function toPrincipal(u: LoadedUser): Principal {
     staffProfileId: u.staffProfile?.id ?? null,
     providerProfileId: u.providerProfile?.id ?? null,
     providerType: u.providerProfile?.providerType ?? null,
+    avatarUrl: u.providerProfile ? publicFileUrl(u.providerProfile.profileImage) : null,
   };
 }
 

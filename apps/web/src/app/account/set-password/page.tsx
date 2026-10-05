@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Field, fieldA11y } from "@/components/forms/field";
 import { PasswordInput } from "@/components/forms/password-input";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { authedRequest } from "@/lib/auth/api";
 import { useMe, homePathFor } from "@/lib/auth/hooks";
 
 const schema = z
@@ -30,6 +31,9 @@ export default function SetPasswordPage() {
       form.setError("password", { message: error.message });
       return;
     }
+    // Lifts the restriction a password-reset-link session starts under (see recovery-lock.ts) —
+    // harmless, and required, for an ordinary session too (nothing to lift there).
+    await authedRequest("/auth/confirm-recovery", { method: "POST" }).catch(() => undefined);
     toast.success("Password saved");
     router.replace((me && homePathFor(me)) ?? "/admin");
   });

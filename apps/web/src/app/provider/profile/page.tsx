@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/dashboard/app-shell";
+import { AccountIdentityCards } from "@/components/account/account-identity-cards";
 import { ProviderProfileForm } from "@/components/providers/provider-profile-form";
 import { useOwnProvider, useUpdateOwnProvider } from "@/lib/api/catalog";
 
@@ -15,7 +16,7 @@ export default function ProviderOwnProfilePage() {
   if (error || !provider) return <p className="text-destructive">{error?.message ?? "Profile not found"}</p>;
 
   return (
-    <div>
+    <div className="grid gap-6">
       <PageHeader title="My profile" description="This is what customers see when choosing who to book with." />
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <ProviderProfileForm
@@ -55,6 +56,12 @@ export default function ProviderOwnProfilePage() {
             <p className="text-muted-foreground">{provider.isActive ? "You are listed on the booking forms." : "You are not listed on the booking forms."}</p>
           </CardContent>
         </Card>
+      </div>
+
+      <div>
+        <h2 className="mb-3 text-lg font-semibold tracking-tight">Account</h2>
+        <p className="mb-4 text-sm text-muted-foreground">Your name, phone and password for signing in — separate from the public card above.</p>
+        <AccountIdentityCards />
       </div>
     </div>
   );

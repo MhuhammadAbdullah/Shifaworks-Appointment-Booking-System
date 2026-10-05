@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import Link from "next/link";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/dashboard/app-shell";
 import { Pagination } from "@/components/tables/pagination";
 import { BookingStatusBadge } from "@/components/bookings/status-badges";
+import { BookingDetailDialog } from "@/components/bookings/booking-detail-dialog";
 import { useBookings } from "@/lib/api/bookings";
 import { useDebounced } from "@/lib/hooks/use-debounced";
 import { formatDateTime } from "@/lib/format";
@@ -27,6 +27,7 @@ function Appointments() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
+  const [viewingId, setViewingId] = useState<string | null>(null);
   const debounced = useDebounced(search);
   useEffect(() => setPage(1), [debounced, from, to]);
 
@@ -92,11 +93,9 @@ function Appointments() {
               </TableRow>
             )}
             {data?.data.map((b) => (
-              <TableRow key={b.id}>
+              <TableRow key={b.id} className="cursor-pointer hover:bg-accent/50" onClick={() => setViewingId(b.id)}>
                 <TableCell>
-                  <Link href={`/provider/appointments/${b.id}`} className="font-mono text-sm font-medium hover:underline">
-                    {b.bookingNumber}
-                  </Link>
+                  <span className="font-mono text-sm font-medium hover:underline">{b.bookingNumber}</span>
                 </TableCell>
                 <TableCell className="font-medium">{b.customerName}</TableCell>
                 <TableCell className="hidden text-sm sm:table-cell">{b.serviceName}</TableCell>
@@ -110,6 +109,7 @@ function Appointments() {
         </Table>
       </div>
       <Pagination meta={data?.meta} onPage={setPage} noun="appointments" />
+      {viewingId && <BookingDetailDialog id={viewingId} onClose={() => setViewingId(null)} />}
     </div>
   );
 }
