@@ -1,5 +1,5 @@
 {
-  "installCommand": "cd ../.. && npm install",
+  "installCommand": "cd ../.. && npm install --include=dev",
   "buildCommand": "cd ../.. && npm run build:shared && cd apps/api && npx prisma generate",
   "crons": [
     { "path": "/api/v1/internal/cron/dispatch", "schedule": "17 3 * * *" },
