@@ -8,7 +8,7 @@ export function RegistrationClosed({ service }: { service: PublicServiceDto }) {
       <CardHeader>
         <CardTitle>Registration Closed</CardTitle>
         <CardDescription>
-          {service.name} isn&apos;t taking online bookings right now. Please get in touch and we&apos;ll help you directly.
+          We are not taking {service.name} bookings right now. Please get in touch and we&apos;ll help you directly.
         </CardDescription>
       </CardHeader>
       <CardContent>
