@@ -1,7 +1,6 @@
 {
   "installCommand": "cd ../.. && npm install",
   "buildCommand": "cd ../.. && npm run build:shared && cd apps/api && npx prisma generate",
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }],
   "crons": [
     { "path": "/api/v1/internal/cron/dispatch", "schedule": "17 3 * * *" },
     { "path": "/api/v1/internal/cron/log-archive", "schedule": "0 3 * * 1" }
