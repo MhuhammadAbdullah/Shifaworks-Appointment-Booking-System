@@ -18,7 +18,11 @@ export const logger = pino({
     ],
     censor: "[REDACTED]",
   },
-  ...(isProduction
+  // pino-pretty spawns a worker thread that needs its own file on disk — unavailable in a
+  // bundled serverless function, so it's gated on more than just isProduction: if NODE_ENV
+  // isn't actually set to "production" on a host like Vercel (process.env.VERCEL is set
+  // there regardless of NODE_ENV), pino-pretty would crash the process on every cold start.
+  ...(isProduction || process.env.VERCEL
     ? {}
     : {
         transport: {
