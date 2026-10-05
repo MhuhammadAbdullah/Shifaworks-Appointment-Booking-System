@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import express, { type Express } from "express";
+import express, { type Express, type RequestHandler } from "express";
 import cors from "cors";
-import * as helmetModule from "helmet";
+import helmetImport from "helmet";
 import cookieParser from "cookie-parser";
 import { rateLimit } from "express-rate-limit";
 import { pinoHttp } from "pino-http";
@@ -11,10 +11,10 @@ import { apiRouter } from "./routes/index.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import type { ApiFailure } from "@booking/shared";
 
-// Namespace import + explicit `.default` above (instead of a default import) sidesteps a
-// helmet dual-package (ESM/CJS) interop mismatch that only surfaces in Vercel's own build-time
-// type-check, not in local tsc runs.
-const helmet = (helmetModule as unknown as { default: typeof helmetModule.default }).default;
+// helmet's dual ESM/CJS package resolves to an uncallable (namespace) type under Vercel's own
+// build-time type-check, even though local tsc resolves it correctly — cast through `unknown`
+// to a hand-written signature so neither environment's resolution of helmet's own types matters.
+const helmet = helmetImport as unknown as (options?: Record<string, unknown>) => RequestHandler;
 
 export function createApp(): Express {
   const app = express();
