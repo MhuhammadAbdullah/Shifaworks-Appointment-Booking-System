@@ -1,9 +1,7 @@
 "use client";
 
 import { Controller } from "react-hook-form";
-import { TriangleAlert } from "lucide-react";
 import type { ClinicalCounselingBookingInput } from "@booking/shared";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -20,12 +18,6 @@ export function ClinicalCounselingDetailsStep({ form, service }: StepProps<Clini
 
   return (
     <div className="grid gap-4">
-      <Alert variant="destructive">
-        <TriangleAlert className="size-4" />
-        <AlertTitle>This form is not monitored in real time</AlertTitle>
-        <AlertDescription>If you are in crisis or need urgent help, please contact emergency services (1122) directly.</AlertDescription>
-      </Alert>
-
       <div className="grid gap-1.5">
         <Label>Areas of concern</Label>
         <ChecklistField form={form} name="details.areasOfConcern" options={options} labels={labels} />
