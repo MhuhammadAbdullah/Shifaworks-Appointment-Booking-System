@@ -113,7 +113,8 @@ function ServicesCard({ provider, readOnly }: { provider: ProviderDto; readOnly:
   const initial = provider.services.map((s) => s.id);
   const [selected, setSelected] = useState<string[]>(initial);
   useEffect(() => setSelected(provider.services.map((s) => s.id)), [provider.services]);
-  const offered = (services.data ?? []).filter((s) => !s.providerType || s.providerType === provider.providerType);
+  // Not filtered by type: some providers do both disciplines and need services assigned across both.
+  const offered = services.data ?? [];
   const dirty = selected.length !== initial.length || selected.some((id) => !initial.includes(id));
 
   return (

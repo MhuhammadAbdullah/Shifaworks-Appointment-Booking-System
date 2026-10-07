@@ -56,15 +56,6 @@ export function ClinicalCounselingDetailsStep({ form, service }: StepProps<Clini
         <Input {...fieldA11y("d-med", details?.currentMedication?.message)} {...form.register("details.currentMedication")} />
       </Field>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field id="d-ename" label="Emergency contact name" error={details?.emergencyContactName?.message}>
-          <Input {...fieldA11y("d-ename", details?.emergencyContactName?.message)} {...form.register("details.emergencyContactName")} />
-        </Field>
-        <Field id="d-ephone" label="Emergency contact phone" error={details?.emergencyContactPhone?.message}>
-          <Input type="tel" {...fieldA11y("d-ephone", details?.emergencyContactPhone?.message)} {...form.register("details.emergencyContactPhone")} />
-        </Field>
-      </div>
-
       <DeliveryModeField form={form} service={service} />
     </div>
   );

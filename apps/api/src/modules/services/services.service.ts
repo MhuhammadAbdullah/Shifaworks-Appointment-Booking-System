@@ -273,15 +273,7 @@ export async function setServiceProviders(principal: Principal, idOrSlug: string
       select: { id: true, displayName: true, providerType: true },
     });
     if (providers.length !== ids.length) throw AppError.validation([{ path: "providers", message: "Provider not found" }]);
-    const wrong = before.providerType ? providers.filter((p) => p.providerType !== before.providerType) : [];
-    if (wrong.length) {
-      throw AppError.validation([
-        {
-          path: "providers",
-          message: `${before.name} is offered by ${before.providerType!.toLowerCase()}s only: ${wrong.map((p) => p.displayName).join(", ")}`,
-        },
-      ]);
-    }
+    // No providerType match required: a provider may practice both disciplines.
 
     await tx.serviceProvider.deleteMany({ where: { serviceId: before.id, providerId: { notIn: ids } } });
     for (const p of input.providers) {

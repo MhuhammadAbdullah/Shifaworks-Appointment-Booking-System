@@ -37,7 +37,11 @@ export function YourDetailsStep<TValues extends BaseBookingValues>({
     <div className="grid gap-5">
       <PersonalStep form={form} />
       <Separator />
-      <ProviderStep form={form} slug={slug} service={service} providerNoun={providerNoun} onSelect={onProviderSelect} />
+      {/* With no packages at all, the service is unbookable regardless of providers — show just the
+          one "nothing available" card from PackageStep instead of duplicating it with ProviderStep's own. */}
+      {service.packages.length > 0 && (
+        <ProviderStep form={form} slug={slug} service={service} providerNoun={providerNoun} onSelect={onProviderSelect} />
+      )}
       <PackageStep form={form} service={service} packageNoun={packageNoun} onSelect={onPackageSelect} />
       <Separator />
       <div className="grid gap-3">

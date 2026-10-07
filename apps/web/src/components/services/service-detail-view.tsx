@@ -112,7 +112,8 @@ function StatusCard({ service, readOnly }: { service: ServiceDto; readOnly: bool
 }
 
 function ProvidersCard({ service, readOnly }: { service: ServiceDto; readOnly: boolean }) {
-  const providers = useProviders({ pageSize: 100, ...(service.providerType ? { type: service.providerType } : {}) });
+  // Not filtered by type: a provider may do both disciplines, so any provider can be offered here.
+  const providers = useProviders({ pageSize: 100 });
   const save = useSetServiceProviders(service.id);
   const initial = new Map(service.providers.map((p) => [p.id, p.linkActive]));
   const [selected, setSelected] = useState(initial);
@@ -133,7 +134,7 @@ function ProvidersCard({ service, readOnly }: { service: ServiceDto; readOnly: b
         {providers.isPending && <Skeleton className="h-20 w-full sm:col-span-2" />}
         {providers.data?.data.length === 0 && (
           <p className="text-sm text-muted-foreground sm:col-span-2">
-            No {service.providerType?.toLowerCase() ?? "provider"}s yet. <Link href="/admin/providers" className="underline">Add one</Link>.
+            No providers yet. <Link href="/admin/providers" className="underline">Add one</Link>.
           </p>
         )}
         {providers.data?.data.map((p) => (

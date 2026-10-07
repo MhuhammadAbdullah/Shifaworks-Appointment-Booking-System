@@ -17,7 +17,7 @@ export default function ClinicalCounselingPage() {
         startsAt: "",
         personal: { firstName: "", phone: "", email: "" },
         location: { city: "" },
-        details: { areasOfConcern: { selected: [] }, emergencyContactName: "", emergencyContactPhone: "" },
+        details: { areasOfConcern: { selected: [] } },
         termsAccepted: false,
         website: "",
       }}

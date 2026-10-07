@@ -74,8 +74,19 @@ async function slugTaken(db: DbClient, organizationId: string, slug: string, exc
   );
 }
 
-/** Services must belong to the organisation and be offered by this provider type. */
-async function assertServices(db: DbClient, organizationId: string, serviceIds: string[], providerType: ProviderType) {
+/**
+ * Services must belong to the organisation. By default they must also be
+ * offered by this provider type — skipped for provider creation, where some
+ * providers genuinely practice both disciplines and need services assigned
+ * across both in one go.
+ */
+async function assertServices(
+  db: DbClient,
+  organizationId: string,
+  serviceIds: string[],
+  providerType: ProviderType,
+  opts: { skipTypeCheck?: boolean } = {},
+) {
   const unique = [...new Set(serviceIds)];
   if (!unique.length) return unique;
   const services = await db.service.findMany({
@@ -83,14 +94,16 @@ async function assertServices(db: DbClient, organizationId: string, serviceIds: 
     select: { id: true, name: true, providerType: true },
   });
   if (services.length !== unique.length) throw AppError.validation([{ path: "serviceIds", message: "Service not found" }]);
-  const incompatible = services.filter((s) => s.providerType && s.providerType !== providerType);
-  if (incompatible.length) {
-    throw AppError.validation([
-      {
-        path: "serviceIds",
-        message: `Not offered by ${providerType.toLowerCase()}s: ${incompatible.map((s) => s.name).join(", ")}`,
-      },
-    ]);
+  if (!opts.skipTypeCheck) {
+    const incompatible = services.filter((s) => s.providerType && s.providerType !== providerType);
+    if (incompatible.length) {
+      throw AppError.validation([
+        {
+          path: "serviceIds",
+          message: `Not offered by ${providerType.toLowerCase()}s: ${incompatible.map((s) => s.name).join(", ")}`,
+        },
+      ]);
+    }
   }
   return unique;
 }
@@ -148,7 +161,7 @@ export async function createProvider(principal: Principal, input: CreateProvider
   const orgId = principal.organizationId;
   const row = await prisma.$transaction(async (tx) => {
     await assertPublicImage(tx, orgId, input.profileImageId, "profileImageId");
-    const serviceIds = await assertServices(tx, orgId, input.serviceIds ?? [], input.providerType);
+    const serviceIds = await assertServices(tx, orgId, input.serviceIds ?? [], input.providerType, { skipTypeCheck: true });
     const slug = await resolveSlug(input.slug, input.displayName, (s) => slugTaken(tx, orgId, s));
     const { serviceIds: _s, slug: _slug, ...fields } = input;
     const created = await tx.providerProfile.create({
@@ -205,7 +218,7 @@ export async function setProviderServices(principal: Principal, id: string, serv
   const orgId = principal.organizationId;
   const row = await prisma.$transaction(async (tx) => {
     const before = await loadProvider(tx, orgId, id);
-    const unique = await assertServices(tx, orgId, serviceIds, before.providerType);
+    const unique = await assertServices(tx, orgId, serviceIds, before.providerType, { skipTypeCheck: true });
     await tx.serviceProvider.deleteMany({ where: { providerId: id, serviceId: { notIn: unique } } });
     await tx.serviceProvider.createMany({ data: unique.map((serviceId) => ({ providerId: id, serviceId })), skipDuplicates: true });
     await recordAudit(tx, ctx, {

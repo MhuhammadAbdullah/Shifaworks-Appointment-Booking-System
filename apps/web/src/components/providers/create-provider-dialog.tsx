@@ -58,8 +58,9 @@ export function CreateProviderDialog({
     },
   });
   const { errors, isSubmitting } = form.formState;
-  const type = form.watch("providerType");
-  const offered = (services.data ?? []).filter((s) => !s.providerType || s.providerType === type);
+  // Not filtered by type: some providers do both disciplines, and an admin
+  // adding one needs to assign services across both in one go.
+  const offered = services.data ?? [];
 
   const onSubmit = form.handleSubmit(async (v) => {
     try {
@@ -67,7 +68,6 @@ export function CreateProviderDialog({
         ...v,
         designation: v.designation || null,
         email: v.email ?? null,
-        serviceIds: v.serviceIds.filter((id) => offered.some((s) => s.id === id)),
       });
       toast.success("Provider added. Next: photo and weekly hours.");
       onClose();

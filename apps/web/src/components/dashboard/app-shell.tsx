@@ -113,8 +113,10 @@ function NavList({ nav, label, collapsed = false }: { nav: NavItem[]; label: str
     <nav className="grid gap-0.5" aria-label={`${label} navigation`}>
       {visible(nav).map((item) => {
         const kids = item.children ? visible(item.children) : [];
-        // Collapsed to an icon rail: no room for sub-items, so a section with children is just a link to its own page.
-        if (kids.length === 0 || collapsed) return <div key={item.href}>{link(item)}</div>;
+        if (kids.length === 0) return <div key={item.href}>{link(item)}</div>;
+        // Collapsed to an icon rail: no room for sub-items, so a section with children links straight to its
+        // first child instead of its own href — some sections (e.g. Finance) have no page of their own at all.
+        if (collapsed) return <div key={item.href}>{link({ ...item, href: kids[0]!.href })}</div>;
 
         const isOpen = openMap[item.href] ?? false;
         const Icon = item.icon;

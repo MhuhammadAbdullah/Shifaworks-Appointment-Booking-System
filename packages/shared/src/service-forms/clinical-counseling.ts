@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { optionalText, phoneSchema } from "../validation.js";
-import { personNameSchema } from "../auth.js";
+import { optionalText } from "../validation.js";
 import { bookingSchema, checklistWithOtherDynamic, deliveryModeField } from "./common.js";
 
 /** Seed data only — the live checklist options are admin-managed per service (see ServiceConcernOption). */
@@ -24,15 +23,12 @@ export const CLINICAL_CONCERN_LABELS: Record<ClinicalConcern, string> = {
   OTHER: "Other",
 };
 
-/** This form is not monitored in real time; the web page shows a crisis notice (emergency: 1122). */
 export const clinicalCounselingDetailsSchema = z
   .object({
     areasOfConcern: checklistWithOtherDynamic(),
     previousDiagnosis: z.boolean(),
     previousDiagnosisDetails: optionalText(500),
     currentMedication: optionalText(500),
-    emergencyContactName: personNameSchema,
-    emergencyContactPhone: phoneSchema,
     deliveryMode: deliveryModeField,
   })
   .refine((v) => !v.previousDiagnosis || Boolean(v.previousDiagnosisDetails?.trim()), {
