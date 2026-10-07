@@ -335,15 +335,15 @@ describe("templates", () => {
     expect(err.code).toBe("VALIDATION_ERROR");
   });
 
-  it("previews a template with sample values without saving it", () => {
-    const preview = previewTemplate({ key: "BOOKING_CONFIRMED", subject: "Hi {{customerName}}", bodyHtml: "<p>{{serviceName}} on {{date}}</p>" });
+  it("previews a template with sample values without saving it", async () => {
+    const preview = await previewTemplate(org.id, { key: "BOOKING_CONFIRMED", subject: "Hi {{customerName}}", bodyHtml: "<p>{{serviceName}} on {{date}}</p>" });
     expect(preview.errors).toEqual([]);
     expect(preview.subject).toContain("Hi ");
     expect(preview.html).toContain("Hijama Therapy");
   });
 
-  it("preview reports an unknown-variable error instead of throwing", () => {
-    const preview = previewTemplate({ key: "BOOKING_CONFIRMED", subject: "Hi", bodyHtml: "{{nope}}" });
+  it("preview reports an unknown-variable error instead of throwing", async () => {
+    const preview = await previewTemplate(org.id, { key: "BOOKING_CONFIRMED", subject: "Hi", bodyHtml: "{{nope}}" });
     expect(preview.errors.length).toBeGreaterThan(0);
     expect(preview.html).toBe("");
   });

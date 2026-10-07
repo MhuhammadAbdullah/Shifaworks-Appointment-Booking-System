@@ -43,9 +43,9 @@ export const updateTemplate: RequestHandler = async (req, res) => {
   sendOk(res, await templates.updateTemplate(principalOf(req), params.id, body, auditContextFrom(req)), "Template saved");
 };
 
-export const previewTemplate: RequestHandler = (req, res) => {
+export const previewTemplate: RequestHandler = async (req, res) => {
   const { body } = validated<PreviewTemplateInput>(req);
-  sendOk(res, templates.previewTemplate(body));
+  sendOk(res, await templates.previewTemplate(principalOf(req).organizationId, body));
 };
 
 export const installDefaultTemplates: RequestHandler = async (req, res) => {

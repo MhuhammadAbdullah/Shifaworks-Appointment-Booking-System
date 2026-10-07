@@ -97,6 +97,28 @@ export async function loadNotificationContext(db: DbClient, bookingId: string, t
   };
 }
 
+/**
+ * The subset of template variables sourced from org Settings rather than any
+ * particular booking — used for template preview and "send test" so an admin
+ * sees their real payment/support details instead of sample placeholders.
+ */
+export async function settingsTemplateVars(db: DbClient, organizationId: string): Promise<Record<string, string>> {
+  const [org, settings] = await Promise.all([
+    db.organization.findUniqueOrThrow({ where: { id: organizationId }, select: { name: true } }),
+    getOrgSettings(organizationId),
+  ]);
+  return {
+    orgName: org.name,
+    paymentInstructions: settings.paymentInstructions,
+    paymentMethod: settings.paymentBankName,
+    accountName: settings.paymentAccountTitle,
+    accountNumber: settings.paymentAccountNumber,
+    iban: settings.paymentIban,
+    whatsappNumber: settings.whatsappNumber,
+    supportEmail: settings.supportEmail,
+  };
+}
+
 export function recipientsFor(audience: NotificationAudience, ctx: NotificationContext, adminEmails: readonly string[]): Recipient[] {
   switch (audience) {
     case "CUSTOMER":

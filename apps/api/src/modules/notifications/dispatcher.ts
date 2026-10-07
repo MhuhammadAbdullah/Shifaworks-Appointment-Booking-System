@@ -21,7 +21,7 @@ import { logger } from "../../config/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import type { Prisma } from "../../generated/prisma/client.js";
 import { enqueueTasks, registerTaskQueue } from "../../jobs/queues.js";
-import { absoluteUrl, loadInviteContext, loadNotificationContext } from "./context.js";
+import { absoluteUrl, loadInviteContext, loadNotificationContext, settingsTemplateVars } from "./context.js";
 import { DeliveryError, getEmailProvider, type SendResult } from "./providers/index.js";
 import { TemplateError, emailLayout, htmlToText, renderTemplate } from "./render.js";
 
@@ -83,7 +83,9 @@ export async function deliverNotification(id: string, now = new Date()): Promise
       orgName = ctx.orgName;
       vars = ctx.vars;
     } else {
-      vars = { ...SAMPLE_TEMPLATE_VALUES, orgName }; // a "send test" row
+      // a "send test" row — real Settings for payment/support fields, sample values for everything booking-specific
+      vars = { ...SAMPLE_TEMPLATE_VALUES, ...(await settingsTemplateVars(prisma, n.organizationId)) };
+      orgName = vars.orgName!;
     }
 
     const email = getEmailProvider();

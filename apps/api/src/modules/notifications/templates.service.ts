@@ -10,6 +10,7 @@ import { recordAudit, type AuditContext } from "../audit/audit.service.js";
 import type { Principal } from "../auth/principal.service.js";
 import { DEFAULT_TEMPLATES } from "./default-templates.js";
 import { emailLayout, htmlToText, renderTemplate, validateTemplate } from "./render.js";
+import { settingsTemplateVars } from "./context.js";
 
 function toDto(t: { id: string; key: string; audience: string; name: string; subject: string; bodyHtml: string; isActive: boolean; updatedAt: Date }): EmailTemplateDto {
   return {
@@ -53,11 +54,15 @@ export async function updateTemplate(p: Principal, id: string, input: UpdateTemp
   return toDto(row);
 }
 
-/** Renders an unsaved template with sample values; problems are returned, not thrown. */
-export function previewTemplate(input: PreviewTemplateInput): TemplatePreviewDto {
+/**
+ * Renders an unsaved template with sample values for anything booking-specific
+ * (no real booking exists to preview with) but the organisation's real Settings
+ * for payment/support fields, so an admin sees their own account details.
+ */
+export async function previewTemplate(organizationId: string, input: PreviewTemplateInput): Promise<TemplatePreviewDto> {
   const errors = [...validateTemplate(input.bodyHtml, input.key), ...validateTemplate(input.subject, input.key)];
   if (errors.length) return { subject: null, html: "", text: "", errors: [...new Set(errors)] };
-  const vars = SAMPLE_TEMPLATE_VALUES;
+  const vars = { ...SAMPLE_TEMPLATE_VALUES, ...(await settingsTemplateVars(prisma, organizationId)) };
   const subject = renderTemplate(input.subject, input.key, vars, "text");
   const fragment = renderTemplate(input.bodyHtml, input.key, vars, "html");
   return { subject, html: emailLayout(vars.orgName!, fragment), text: htmlToText(fragment), errors: [] };
