@@ -32,7 +32,8 @@ export const MAX_NOTIFICATION_ATTEMPTS = 5;
 export const TEMPLATE_VARIABLES: Record<EmailTemplateKey, readonly string[]> = {
   BOOKING_RECEIVED: [
     "orgName", "customerName", "customerPhone", "customerEmail", "bookingNumber", "serviceName", "providerName",
-    "date", "time", "amount", "currency", "source", "paymentInstructions", "whatsappNumber", "supportEmail", "link",
+    "date", "time", "amount", "currency", "source", "paymentInstructions", "paymentMethod", "accountName",
+    "accountNumber", "iban", "whatsappNumber", "supportEmail", "link",
   ],
   BOOKING_CONFIRMED: ["orgName", "customerName", "customerPhone", "bookingNumber", "serviceName", "providerName", "date", "time", "amount", "currency", "link", "qrCodeUrl"],
   PAYMENT_REJECTED: ["orgName", "customerName", "bookingNumber", "serviceName", "reason", "paymentInstructions", "whatsappNumber", "supportEmail"],
@@ -58,6 +59,10 @@ export const SAMPLE_TEMPLATE_VALUES: Record<string, string> = {
   source: "Online",
   reason: "Requested by the customer",
   paymentInstructions: "Transfer to the bank account below and send a screenshot on WhatsApp.",
+  paymentMethod: "Meezan Bank",
+  accountName: "ShifaWorks",
+  accountNumber: "0123456789012",
+  iban: "PK00MEZN0000000123456789",
   whatsappNumber: "+923001234567",
   supportEmail: "support@shifaworks.com",
   link: "https://booking.shifaworks.com/admin/bookings/00000000-0000-0000-0000-000000000000",
