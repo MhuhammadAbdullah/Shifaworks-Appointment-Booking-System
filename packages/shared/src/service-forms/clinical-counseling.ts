@@ -2,7 +2,7 @@ import { z } from "zod";
 import { optionalText } from "../validation.js";
 import { bookingSchema, checklistWithOtherDynamic, deliveryModeField } from "./common.js";
 
-/** Seed data only — the live checklist options are admin-managed per service (see ServiceConcernOption). */
+/** Seed data only — the live checklist options are admin-managed per provider (see ProviderConcernOption). */
 export const CLINICAL_CONCERNS = [
   "ANXIETY",
   "DEPRESSION",
@@ -26,7 +26,7 @@ export const CLINICAL_CONCERN_LABELS: Record<ClinicalConcern, string> = {
 export const clinicalCounselingDetailsSchema = z
   .object({
     areasOfConcern: checklistWithOtherDynamic(),
-    previousDiagnosis: z.boolean(),
+    previousDiagnosis: z.boolean("Please choose Yes or No"),
     previousDiagnosisDetails: optionalText(500),
     currentMedication: optionalText(500),
     deliveryMode: deliveryModeField,

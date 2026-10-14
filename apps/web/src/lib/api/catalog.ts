@@ -113,23 +113,6 @@ export const useDeletePackage = (serviceId: string) =>
     serviceChanges,
   );
 
-export const useCreateConcernOption = (serviceId: string) =>
-  useInvalidatingMutation(
-    (body: CreateConcernOptionInput) => data(authedRequest<ConcernOptionDto>(`/services/${serviceId}/concern-options`, { method: "POST", body })),
-    serviceChanges,
-  );
-export const useUpdateConcernOption = (serviceId: string) =>
-  useInvalidatingMutation(
-    ({ id, body }: { id: string; body: UpdateConcernOptionInput }) =>
-      data(authedRequest<ConcernOptionDto>(`/services/${serviceId}/concern-options/${id}`, { method: "PATCH", body })),
-    serviceChanges,
-  );
-export const useDeleteConcernOption = (serviceId: string) =>
-  useInvalidatingMutation(
-    (id: string) => authedRequest<void>(`/services/${serviceId}/concern-options/${id}`, { method: "DELETE" }),
-    serviceChanges,
-  );
-
 // ---- providers --------------------------------------------------------------------
 
 export function useProviders(query: Partial<ListProvidersQuery> = {}, enabled = true) {
@@ -140,10 +123,11 @@ export function useProviders(query: Partial<ListProvidersQuery> = {}, enabled = 
     enabled,
   });
 }
-export function useProvider(id: string) {
+export function useProvider(id: string, enabled = true) {
   return useQuery({
     queryKey: catalogKeys.provider(id),
     queryFn: ({ signal }) => data(authedRequest<ProviderDto>(`/providers/${id}`, { signal })),
+    enabled: enabled && Boolean(id),
   });
 }
 export function useOwnProvider() {
@@ -162,6 +146,24 @@ export const useUpdateProvider = (id: string) =>
   );
 export const useDeleteProvider = () =>
   useInvalidatingMutation((id: string) => authedRequest<void>(`/providers/${id}`, { method: "DELETE" }), providerChanges);
+
+// "Areas of concern" checklist: each provider's own list.
+export const useCreateConcernOption = (providerId: string) =>
+  useInvalidatingMutation(
+    (body: CreateConcernOptionInput) => data(authedRequest<ConcernOptionDto>(`/providers/${providerId}/concern-options`, { method: "POST", body })),
+    providerChanges,
+  );
+export const useUpdateConcernOption = (providerId: string) =>
+  useInvalidatingMutation(
+    ({ id, body }: { id: string; body: UpdateConcernOptionInput }) =>
+      data(authedRequest<ConcernOptionDto>(`/providers/${providerId}/concern-options/${id}`, { method: "PATCH", body })),
+    providerChanges,
+  );
+export const useDeleteConcernOption = (providerId: string) =>
+  useInvalidatingMutation(
+    (id: string) => authedRequest<void>(`/providers/${providerId}/concern-options/${id}`, { method: "DELETE" }),
+    providerChanges,
+  );
 
 export interface BulkDeleteResult {
   succeeded: number;

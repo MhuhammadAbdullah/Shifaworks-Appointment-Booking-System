@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { z } from "zod";
-import { CONCERN_CHECKLIST_LABEL, SERVICE_DEFINITIONS, isServiceSlug, type ServiceDto } from "@booking/shared";
+import { SERVICE_DEFINITIONS, isServiceSlug, type ServiceDto } from "@booking/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,7 +18,6 @@ import { CheckField } from "@/components/forms/check-field";
 import { Field, fieldA11y } from "@/components/forms/field";
 import { ServiceOpenBadge } from "@/components/services/service-open-badge";
 import { PackagesCard } from "@/components/services/packages-card";
-import { ConcernOptionsCard } from "@/components/services/concern-options-card";
 import { usePermissions } from "@/lib/auth/hooks";
 import { useProviders, useService, useSetServiceProviders, useUpdateService } from "@/lib/api/catalog";
 import { ApiError } from "@/lib/api-client";
@@ -34,7 +33,6 @@ export function ServiceDetailView({ slug }: { slug: string }) {
   if (error || !service) return <p className="text-destructive">{error?.message ?? "Service not found"}</p>;
 
   const def = isServiceSlug(service.slug) ? SERVICE_DEFINITIONS[service.slug] : null;
-  const concernLabel = isServiceSlug(service.slug) ? CONCERN_CHECKLIST_LABEL[service.slug] : undefined;
   const canEdit = can("services.update");
 
   return (
@@ -56,9 +54,6 @@ export function ServiceDetailView({ slug }: { slug: string }) {
 
       <StatusCard service={service} readOnly={!canEdit} />
       <PackagesCard service={service} packageNoun={def?.packageNoun ?? "option"} readOnly={!can("services.manage_packages")} />
-      {concernLabel && (
-        <ConcernOptionsCard service={service} fieldLabel={concernLabel} readOnly={!can("services.manage_concern_options")} />
-      )}
       <ProvidersCard service={service} readOnly={!canEdit} />
       <TimingCard service={service} readOnly={!canEdit} />
     </div>

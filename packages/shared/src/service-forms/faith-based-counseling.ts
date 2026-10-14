@@ -25,7 +25,7 @@ export const FAITH_COUNSELING_AREA_LABELS: Record<FaithCounselingArea, string> =
 
 export const faithBasedCounselingDetailsSchema = z.object({
   areasOfConcern: checklistWithOtherDynamic(),
-  previousCounselling: z.boolean(),
+  previousCounselling: z.boolean("Please choose Yes or No"),
   anythingElse: optionalText(1000),
   deliveryMode: deliveryModeField,
 });

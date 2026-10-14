@@ -88,7 +88,7 @@ export const CONCERN_CHECKLIST_FIELD: Partial<Record<ServiceSlug, string>> = {
   "islamic-life-coaching": "coachingAreas",
 };
 
-/** Label shown above the checklist on the booking form and in the admin Services page. */
+/** Label shown above the checklist on the booking form and on the provider's "Areas of concern" card. */
 export const CONCERN_CHECKLIST_LABEL: Partial<Record<ServiceSlug, string>> = {
   "clinical-counseling": "Areas of concern",
   "faith-based-counseling": "Areas of concern",

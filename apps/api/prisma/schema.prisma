@@ -457,6 +457,7 @@ model ProviderProfile {
   user                   User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
   profileImage           File?                   @relation("ProviderImage", fields: [profileImageId], references: [id], onDelete: SetNull)
   locations              ProviderLocation[]
+  concernOptions         ProviderConcernOption[]
   services               ServiceProvider[]
   availabilities         Availability[]
   availabilityExceptions AvailabilityException[]
@@ -557,6 +558,10 @@ model Service {
 // (clinical/faith-based counseling, life coaching). `code` is the stable key
 // stored in a booking's formData — never reuse a code after deleting it.
 // "Other" is a fixed client-side choice, not a row here.
+//
+// DEPRECATED: the booking form now reads each provider's own list (ProviderConcernOption).
+// This table is kept, read-only, as the source the provider lists were copied from and as a
+// label fallback for bookings made before the move; nothing writes to it any more.
 model ServiceConcernOption {
   id        String   @id @default(uuid()) @db.Uuid
   serviceId String   @db.Uuid
@@ -572,6 +577,27 @@ model ServiceConcernOption {
   @@unique([serviceId, code])
   @@index([serviceId, isActive, sortOrder])
   @@map("service_concern_options")
+}
+
+// "Areas of concern" style checklist options, managed per provider: every provider covers a
+// different set. `code` is the stable key stored in a booking's formData — never reuse a code
+// after deleting it. "Other" is a fixed client-side choice, not a row here. A provider with no
+// active rows shows customers only "Other" with its text box.
+model ProviderConcernOption {
+  id         String   @id @default(uuid()) @db.Uuid
+  providerId String   @db.Uuid
+  code       String
+  label      String
+  isActive   Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(3)
+
+  provider ProviderProfile @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, code])
+  @@index([providerId, isActive, sortOrder])
+  @@map("provider_concern_options")
 }
 
 // Priced options of a service: Hijama packages, counselling session types.

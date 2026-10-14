@@ -1,16 +1,12 @@
 import { Router } from "express";
 import { z } from "zod";
 import {
-  createConcernOptionSchema,
   createPackageSchema,
   setServiceProvidersSchema,
-  updateConcernOptionSchema,
   updatePackageSchema,
   updateServiceSchema,
-  type CreateConcernOptionInput,
   type CreatePackageInput,
   type SetServiceProvidersInput,
-  type UpdateConcernOptionInput,
   type UpdatePackageInput,
   type UpdateServiceInput,
 } from "@booking/shared";
@@ -29,10 +25,8 @@ servicesRouter.use(requireAuth);
 
 const idParams = z.object({ id: z.string().trim().min(2).max(80) });
 const packageParams = idParams.extend({ packageId: z.uuid() });
-const optionParams = idParams.extend({ optionId: z.uuid() });
 type IdParams = z.infer<typeof idParams>;
 type PackageParams = z.infer<typeof packageParams>;
-type OptionParams = z.infer<typeof optionParams>;
 
 servicesRouter.get("/", requirePermission("services.view"), async (req, res) => {
   sendOk(res, await service.listServices(principalOf(req)));
@@ -98,37 +92,3 @@ servicesRouter.delete(
   },
 );
 
-servicesRouter.post(
-  "/:id/concern-options",
-  requirePermission("services.manage_concern_options"),
-  validate({ params: idParams, body: createConcernOptionSchema }),
-  async (req, res) => {
-    const { body, params } = validated<CreateConcernOptionInput, unknown, IdParams>(req);
-    sendCreated(res, await service.createConcernOption(principalOf(req), params.id, body, auditContextFrom(req)), "Added");
-  },
-);
-
-servicesRouter.patch(
-  "/:id/concern-options/:optionId",
-  requirePermission("services.manage_concern_options"),
-  validate({ params: optionParams, body: updateConcernOptionSchema }),
-  async (req, res) => {
-    const { body, params } = validated<UpdateConcernOptionInput, unknown, OptionParams>(req);
-    sendOk(
-      res,
-      await service.updateConcernOption(principalOf(req), params.id, params.optionId, body, auditContextFrom(req)),
-      "Saved",
-    );
-  },
-);
-
-servicesRouter.delete(
-  "/:id/concern-options/:optionId",
-  requirePermission("services.manage_concern_options"),
-  validate({ params: optionParams }),
-  async (req, res) => {
-    const { params } = validated<unknown, unknown, OptionParams>(req);
-    await service.deleteConcernOption(principalOf(req), params.id, params.optionId, auditContextFrom(req));
-    sendNoContent(res);
-  },
-);

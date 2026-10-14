@@ -251,6 +251,29 @@ async function seedConcernOptions(serviceIds: Map<ServiceSlug, string>) {
   log(`${count} concern-checklist options (clinical/faith-based counseling, life coaching)`);
 }
 
+/**
+ * Providers each own their "Areas of concern" list now. Give every provider that offers a checklist
+ * service the starter options above (never overwrites a row someone has edited).
+ */
+async function seedProviderConcernOptions() {
+  const links = await prisma.serviceProvider.findMany({
+    where: { service: { concernOptions: { some: {} } } },
+    select: { providerId: true, service: { select: { concernOptions: { orderBy: { sortOrder: "asc" }, select: { code: true, label: true, sortOrder: true } } } } },
+  });
+  let count = 0;
+  for (const link of links) {
+    for (const opt of link.service.concernOptions) {
+      await prisma.providerConcernOption.upsert({
+        where: { providerId_code: { providerId: link.providerId, code: opt.code } },
+        create: { providerId: link.providerId, code: opt.code, label: opt.label, sortOrder: opt.sortOrder },
+        update: {},
+      });
+      count++;
+    }
+  }
+  log(`${count} provider concern-checklist options`);
+}
+
 // ---------------------------------------------------------------------------
 // Demo data (development only)
 // ---------------------------------------------------------------------------
@@ -444,6 +467,7 @@ async function main() {
   const serviceIds = await seedServices(org.id);
   await seedConcernOptions(serviceIds);
   if (DEMO) await seedDemo(org.id, location.id, serviceIds);
+  await seedProviderConcernOptions();
   console.log("Seed complete.");
 }
 

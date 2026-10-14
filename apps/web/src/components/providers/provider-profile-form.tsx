@@ -133,117 +133,152 @@ export function ProviderProfileForm({
     />
   );
 
+  const dirty = isDirty || photo.id !== provider.profileImageId;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>{admin ? "Profile" : "Your profile card"}</CardTitle>
-        <CardDescription>Customers see the photo, name, designation, experience and rating when choosing a provider.</CardDescription>
+        <CardDescription>Fill in the sections below, then save once at the bottom.</CardDescription>
       </CardHeader>
       <form onSubmit={onSubmit} noValidate>
         <fieldset disabled={readOnly}>
-          <CardContent className="grid gap-4">
-            <Field id="pp-photo" label="Photo" optional>
-              <ImageUpload
-                id="pp-photo"
-                shape="square"
-                url={photo.url}
-                disabled={readOnly}
-                onChange={(img) => setPhoto(img ?? { id: null, url: null })}
-              />
-            </Field>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {admin && (
-                <Field id="pp-name" label="Name" error={errors.displayName?.message} required info="As shown to customers, e.g. HK. Hayyan Marfani">
-                  <Input {...fieldA11y("pp-name", errors.displayName?.message)} {...form.register("displayName")} />
+          <CardContent className="grid gap-8">
+            <FormSection title="Public card" hint="What patients see when they choose a provider on the booking form.">
+              <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-start">
+                <Field id="pp-photo" label="Photo" optional>
+                  <ImageUpload id="pp-photo" shape="square" url={photo.url} disabled={readOnly} onChange={(img) => setPhoto(img ?? { id: null, url: null })} />
                 </Field>
-              )}
-              <Field id="pp-designation" label="Designation" error={errors.designation?.message} optional info="e.g. Hijama Therapist">
-                <Input {...fieldA11y("pp-designation", errors.designation?.message)} {...form.register("designation")} />
-              </Field>
-            </div>
-            {admin && (
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Field id="pp-exp" label="Years of experience" error={errors.experienceYears?.message} required>
-                  <Input type="number" min={0} {...fieldA11y("pp-exp", errors.experienceYears?.message)} {...form.register("experienceYears")} />
-                </Field>
-                <Field id="pp-rating" label="Rating (0–5)" error={errors.rating?.message} optional info="Leave empty to hide the stars on the booking form">
-                  <Input type="number" min={0} max={5} step={0.1} {...fieldA11y("pp-rating", errors.rating?.message)} {...form.register("rating")} />
-                </Field>
-                <Field id="pp-gender" label="Gender" required>
-                  <Controller
-                    control={form.control}
-                    name="gender"
-                    render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange} disabled={readOnly}>
-                        <SelectTrigger id="pp-gender">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {GENDERS.map((g) => (
-                            <SelectItem key={g} value={g}>
-                              {GENDER_LABELS[g]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </Field>
-              </div>
-            )}
-            {admin && (
-              <fieldset className="grid gap-2 rounded-md border p-3">
-                <legend className="px-1 text-sm font-medium">Accepts customers</legend>
-                <div className="flex flex-wrap gap-6">
-                  {check("acceptsMale", "Male")}
-                  {check("acceptsFemale", "Female")}
+                <div className="grid gap-3">
+                  {admin && (
+                    <Field id="pp-name" label="Name" error={errors.displayName?.message} required info="As shown to patients, e.g. HK. Hayyan Marfani">
+                      <Input {...fieldA11y("pp-name", errors.displayName?.message)} {...form.register("displayName")} />
+                    </Field>
+                  )}
+                  <Field id="pp-designation" label="Designation" error={errors.designation?.message} optional info="e.g. Hijama Therapist">
+                    <Input {...fieldA11y("pp-designation", errors.designation?.message)} {...form.register("designation")} />
+                  </Field>
                 </div>
-                {errors.acceptsFemale && <p className="text-sm text-destructive">{errors.acceptsFemale.message}</p>}
-                <p className="text-xs text-muted-foreground">
-                  The booking form only offers this provider to customers of the ticked genders.
-                </p>
-              </fieldset>
-            )}
-            <div className="grid gap-3 sm:grid-cols-2">
-              {admin && (
-                <Field id="pp-email" label="Email" error={errors.email?.message} optional info="Receives “New Booking Confirmed” emails">
-                  <Input type="email" {...fieldA11y("pp-email", errors.email?.message)} {...form.register("email")} />
-                </Field>
-              )}
-              <Field id="pp-phone" label="Phone" error={errors.phone?.message} optional>
-                <Input type="tel" {...fieldA11y("pp-phone", errors.phone?.message)} {...form.register("phone")} />
+              </div>
+              <Field id="pp-bio" label="About" error={errors.bio?.message} optional>
+                <Textarea rows={4} {...fieldA11y("pp-bio", errors.bio?.message)} {...form.register("bio")} />
               </Field>
-            </div>
-            <Field id="pp-spec" label="Specialisations" optional>
-              <Controller
-                control={form.control}
-                name="specializations"
-                render={({ field }) => (
-                  <TagInput id="pp-spec" value={field.value} onChange={field.onChange} placeholder="e.g. Sciatica - press Enter" disabled={readOnly} />
-                )}
-              />
-            </Field>
-            <Field id="pp-bio" label="About" error={errors.bio?.message} optional>
-              <Textarea rows={4} {...fieldA11y("pp-bio", errors.bio?.message)} {...form.register("bio")} />
-            </Field>
+              <Field id="pp-spec" label="Specialisations" optional>
+                <Controller
+                  control={form.control}
+                  name="specializations"
+                  render={({ field }) => (
+                    <TagInput id="pp-spec" value={field.value} onChange={field.onChange} placeholder="e.g. Sciatica - press Enter" disabled={readOnly} />
+                  )}
+                />
+              </Field>
+              {admin && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field id="pp-exp" label="Years of experience" error={errors.experienceYears?.message} required>
+                    <Input type="number" min={0} {...fieldA11y("pp-exp", errors.experienceYears?.message)} {...form.register("experienceYears")} />
+                  </Field>
+                  <Field id="pp-rating" label="Rating (0–5)" error={errors.rating?.message} optional info="Leave empty to hide the stars on the booking form">
+                    <Input type="number" min={0} max={5} step={0.1} {...fieldA11y("pp-rating", errors.rating?.message)} {...form.register("rating")} />
+                  </Field>
+                </div>
+              )}
+            </FormSection>
+
             {admin && (
-              <div className="grid items-end gap-3 sm:grid-cols-2">
-                {check("isActive", "Active", "Inactive providers are hidden from the booking forms")}
-                <Field id="pp-sort" label="Display order" error={errors.sortOrder?.message} required info="Lower numbers are listed first">
-                  <Input type="number" min={0} {...fieldA11y("pp-sort", errors.sortOrder?.message)} {...form.register("sortOrder")} />
+              <FormSection title="Who they see" hint="The booking form only offers this provider to patients of the ticked genders.">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field id="pp-gender" label="Their gender" required>
+                    <Controller
+                      control={form.control}
+                      name="gender"
+                      render={({ field }) => (
+                        <Select value={field.value} onValueChange={field.onChange} disabled={readOnly}>
+                          <SelectTrigger id="pp-gender">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {GENDERS.map((g) => (
+                              <SelectItem key={g} value={g}>
+                                {GENDER_LABELS[g]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </Field>
+                  <div className="grid gap-1.5">
+                    <p className="text-sm font-medium">Accepts patients</p>
+                    <div className="flex flex-wrap gap-6 pt-1.5">
+                      {check("acceptsMale", "Male")}
+                      {check("acceptsFemale", "Female")}
+                    </div>
+                    {errors.acceptsFemale && <p className="text-sm text-destructive">{errors.acceptsFemale.message}</p>}
+                  </div>
+                </div>
+              </FormSection>
+            )}
+
+            <FormSection title="Contact" hint={admin ? "Not shown to patients." : "Not shown to patients."}>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {admin && (
+                  <Field id="pp-email" label="Email" error={errors.email?.message} optional info="Receives “New Booking Confirmed” emails">
+                    <Input type="email" {...fieldA11y("pp-email", errors.email?.message)} {...form.register("email")} />
+                  </Field>
+                )}
+                <Field id="pp-phone" label="Phone" error={errors.phone?.message} optional>
+                  <Input type="tel" {...fieldA11y("pp-phone", errors.phone?.message)} {...form.register("phone")} />
                 </Field>
               </div>
+            </FormSection>
+
+            {admin && (
+              <FormSection title="Listing" hint="Where and whether they appear on the booking forms.">
+                <div className="grid items-start gap-3 sm:grid-cols-2">
+                  {check("isActive", "Active", "Inactive providers are hidden from the booking forms")}
+                  <Field id="pp-sort" label="Display order" error={errors.sortOrder?.message} required info="Lower numbers are listed first">
+                    <Input type="number" min={0} {...fieldA11y("pp-sort", errors.sortOrder?.message)} {...form.register("sortOrder")} />
+                  </Field>
+                </div>
+              </FormSection>
             )}
           </CardContent>
         </fieldset>
         {!readOnly && (
-          <CardFooter className="mt-4 justify-end">
-            <Button type="submit" disabled={isSubmitting || (!isDirty && photo.id === provider.profileImageId)}>
+          // Stays at the bottom of the visible area while the form scrolls; says plainly whether anything is unsaved.
+          <CardFooter className="sticky bottom-0 z-10 mt-2 flex-wrap justify-end gap-3 rounded-b-xl border-t bg-card/95 py-3 backdrop-blur">
+            <span className="mr-auto text-sm text-muted-foreground">{dirty ? "You have unsaved changes." : "All changes saved."}</span>
+            {dirty && (
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={isSubmitting}
+                onClick={() => {
+                  form.reset(toValues(provider));
+                  setPhoto({ id: provider.profileImageId, url: provider.profileImageUrl });
+                }}
+              >
+                Discard
+              </Button>
+            )}
+            <Button type="submit" disabled={isSubmitting || !dirty}>
               {isSubmitting ? "Saving…" : "Save profile"}
             </Button>
           </CardFooter>
         )}
       </form>
     </Card>
+  );
+}
+
+function FormSection({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="grid gap-4">
+      <div>
+        <h3 className="text-sm font-semibold">{title}</h3>
+        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      </div>
+      {children}
+    </section>
   );
 }

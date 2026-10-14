@@ -1,7 +1,7 @@
 "use client";
 
 import { Separator } from "@/components/ui/separator";
-import type { PublicPackageDto, PublicProviderDto, PublicServiceDto, ServiceSlug } from "@booking/shared";
+import { CONCERN_CHECKLIST_FIELD, type PublicPackageDto, type PublicProviderDto, type PublicServiceDto, type ServiceSlug } from "@booking/shared";
 import { PersonalStep } from "./steps";
 import { ProviderStep } from "./provider-step";
 import { PackageStep } from "./package-step";
@@ -37,8 +37,12 @@ export function YourDetailsStep<TValues extends BaseBookingValues>({
 }) {
   return (
     <div className="grid gap-5">
+      <p className="text-base font-semibold">About you</p>
       <PersonalStep form={form} />
       <Separator />
+      <p className="text-base font-semibold">
+        Your {providerNoun} &amp; session
+      </p>
       {/* With no packages at all, the service is unbookable regardless of providers — show just the
           one "nothing available" card from PackageStep instead of duplicating it with ProviderStep's own. */}
       {service.packages.length > 0 && (
@@ -54,7 +58,12 @@ export function YourDetailsStep<TValues extends BaseBookingValues>({
       <PackageStep form={form} service={service} packageNoun={packageNoun} onSelect={onPackageSelect} />
       <Separator />
       <div className="grid gap-3">
-        <p className="text-sm font-medium">{detailsLabel}</p>
+        <p className="text-base font-semibold">{detailsLabel}</p>
+        {CONCERN_CHECKLIST_FIELD[slug] && !form.watch().providerId && (
+          <p className="text-sm text-muted-foreground">
+            Choose your {providerNoun} above to see the areas they cover. You can always pick &quot;Other&quot; and describe it.
+          </p>
+        )}
         <DetailsStep form={form} service={service} />
       </div>
     </div>

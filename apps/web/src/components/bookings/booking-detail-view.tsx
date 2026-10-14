@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { BookingStatusBadge, PaymentStatusBadge } from "@/components/bookings/status-badges";
 import { StaffDateTimePicker } from "@/components/bookings/staff-datetime-picker";
 import { usePermissions } from "@/lib/auth/hooks";
-import { useProviders, useService } from "@/lib/api/catalog";
+import { useProvider, useProviders, useService } from "@/lib/api/catalog";
 import {
   useBooking,
   useCancelBooking,
@@ -61,6 +61,8 @@ export function BookingDetailView({
   const { can, me } = usePermissions();
   const { data: booking, isPending, error } = useBooking(id);
   const concernService = useService(booking?.service.slug ?? "", Boolean(booking));
+  // Checklist codes are the provider's own; staff who cannot open providers fall back to the old service-level labels.
+  const concernProvider = useProvider(booking?.provider.id ?? "", Boolean(booking) && can("providers.view"));
   const [dialog, setDialog] = useState<"cancel" | "reschedule" | "edit" | "delete" | null>(null);
   const complete = useCompleteBooking(id);
   const noShow = useMarkNoShow(id);
@@ -265,7 +267,7 @@ export function BookingDetailView({
               <div key={key} className="flex justify-between gap-4 border-b pb-1.5 last:border-0">
                 <span className="text-muted-foreground">{titleCase(key)}</span>
                 <span className="text-right">
-                  {isChecklistValue(value) ? describeChecklist(value, concernService.data?.concernOptions ?? []) : describeValue(value)}
+                  {isChecklistValue(value) ? describeChecklist(value, [...(concernProvider.data?.concernOptions ?? []), ...(concernService.data?.concernOptions ?? [])]) : describeValue(value)}
                 </span>
               </div>
             ))}

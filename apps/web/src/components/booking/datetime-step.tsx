@@ -8,13 +8,20 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePublicAvailableDates, usePublicSlots } from "@/lib/api/public";
 import { publicEnv } from "@/lib/env";
-import { addDays, formatTime12, localDate } from "@/lib/format";
+import { addDays, formatDate, formatTime12, localDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { isSlotOffered, zonedDate } from "./prefill";
 import type { BaseBookingValues, StepProps } from "./wizard-types";
 
 const WINDOW_DAYS = 61; // < MAX_DATE_RANGE_DAYS (62)
 const WEEKDAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** Morning / afternoon / evening, by the slot's own local "HH:MM" (what the visitor reads on a clock). */
+const PERIODS = [
+  { key: "morning", label: "Morning", test: (hour: number) => hour < 12 },
+  { key: "afternoon", label: "Afternoon", test: (hour: number) => hour >= 12 && hour < 17 },
+  { key: "evening", label: "Evening", test: (hour: number) => hour >= 17 },
+];
 
 /** ISO weekday, Monday-first (0 = Monday .. 6 = Sunday), for a "YYYY-MM-DD" string treated as UTC. */
 function mondayFirstWeekday(isoDate: string): number {
@@ -102,7 +109,7 @@ export function DateTimeStep<TValues extends BaseBookingValues>({
         <p className="text-sm text-destructive">{dates.error.message}</p>
       ) : (
         <div className="flex flex-col divide-y overflow-hidden rounded-lg border bg-background sm:flex-row sm:divide-x sm:divide-y-0">
-          <div className="p-3">
+          <div className="p-3 sm:shrink-0">
             <div className="mb-2 flex items-center justify-between">
               <Button type="button" variant="ghost" size="icon" className="size-7" disabled={!canGoPrev} onClick={() => shiftMonth(-1)} aria-label="Previous month">
                 <ChevronLeft className="size-4" />
@@ -119,7 +126,7 @@ export function DateTimeStep<TValues extends BaseBookingValues>({
                 </div>
               ))}
             </div>
-            <div className="grid w-96 grid-cols-7 gap-1" role="group" aria-label="Choose a date">
+            <div className="grid w-full grid-cols-7 gap-1 sm:w-80" role="group" aria-label="Choose a date">
               {cells.map((d, i) => {
                 if (!d) return <div key={i} />;
                 const inWindow = d >= from && d <= to;
@@ -170,19 +177,30 @@ export function DateTimeStep<TValues extends BaseBookingValues>({
                   ) : slots.isPending ? (
                     <Skeleton className="h-9 w-full" />
                   ) : slots.data?.slots.length ? (
-                    slots.data.slots.map((s) => (
-                      <Button
-                        key={s.startsAt}
-                        type="button"
-                        size="sm"
-                        variant={startsAt === s.startsAt ? "default" : "outline"}
-                        aria-pressed={startsAt === s.startsAt}
-                        className={startsAt === s.startsAt ? "bg-[#86C242] text-[#14210a] hover:bg-[#72A538]" : undefined}
-                        onClick={() => chooseTime(s.startsAt)}
-                      >
-                        {formatTime12(s.startsAt, slots.data.timezone)}
-                      </Button>
-                    ))
+                    PERIODS.map((period) => {
+                      const inPeriod = slots.data.slots.filter((s) => period.test(Number(s.time.slice(0, 2))));
+                      if (inPeriod.length === 0) return null;
+                      return (
+                        <div key={period.key} className="grid gap-2">
+                          <p className="pt-1 text-xs font-medium text-muted-foreground">{period.label}</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {inPeriod.map((s) => (
+                              <Button
+                                key={s.startsAt}
+                                type="button"
+                                size="sm"
+                                variant={startsAt === s.startsAt ? "default" : "outline"}
+                                aria-pressed={startsAt === s.startsAt}
+                                className={startsAt === s.startsAt ? "bg-[#86C242] text-[#14210a] hover:bg-[#72A538]" : undefined}
+                                onClick={() => chooseTime(s.startsAt)}
+                              >
+                                {formatTime12(s.startsAt, slots.data.timezone)}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })
                   ) : (
                     <p className="pt-6 text-center text-sm text-muted-foreground">No free times on this date.</p>
                   )}
@@ -191,6 +209,12 @@ export function DateTimeStep<TValues extends BaseBookingValues>({
             </div>
           </div>
         </div>
+      )}
+      {startsAt && (
+        <p className="rounded-md border border-[#86C242]/60 bg-[#86C242]/10 p-3 text-sm" aria-live="polite">
+          Selected: <span className="font-medium">{formatDate(startsAt, dates.data?.timezone ?? publicEnv.NEXT_PUBLIC_DEFAULT_TIMEZONE)}</span> at{" "}
+          <span className="font-medium">{formatTime12(startsAt, dates.data?.timezone ?? publicEnv.NEXT_PUBLIC_DEFAULT_TIMEZONE)}</span>
+        </p>
       )}
       {dates.data && available.size === 0 && (
         <p className="text-sm text-muted-foreground">No free times in the next two months. Please contact support.</p>

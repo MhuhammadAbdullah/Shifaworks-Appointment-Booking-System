@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Mail, Plus, Receipt, RefreshCw, Trash2 } from "lucide-react";
+import { Check, CircleAlert, Mail, Plus, Receipt, RefreshCw, Star, Trash2, UserRound } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { PROVIDER_TYPE_LABELS, type ProviderDto } from "@booking/shared";
@@ -23,6 +23,7 @@ import { AvailabilityEditor } from "@/components/availability/availability-edito
 import { SlotPreview } from "@/components/availability/slot-preview";
 import { ProviderProfileForm } from "@/components/providers/provider-profile-form";
 import { WebsiteCalendarCard } from "@/components/providers/website-calendar-card";
+import { ConcernOptionsCard, providerChecklistLabel } from "@/components/services/concern-options-card";
 import { UserStatusBadge } from "@/components/dashboard/status-badge";
 import { InvoiceStatusBadge } from "@/components/finance/status-badges";
 import { usePermissions } from "@/lib/auth/hooks";
@@ -38,74 +39,187 @@ import { useCreatePayslip, useInvoices } from "@/lib/api/invoices";
 import { ApiError } from "@/lib/api-client";
 import { formatMoney } from "@/lib/format";
 import { generatePassword } from "@/lib/generate-password";
+import { cn } from "@/lib/utils";
 
 const errorText = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 
-/** Opened as a popup from the providers list. */
+type TabKey = "profile" | "services" | "availability" | "website" | "account";
+
+/**
+ * One provider, organised by task instead of one long scroll:
+ * a summary header with a readiness strip, then Profile / Services / Availability / Website / Account & pay.
+ * Opened as a popup from the providers list and as the standalone /admin/providers/[id] page.
+ */
 export function ProviderDetailView({ id, onClose }: { id: string; onClose: () => void }) {
   const { can } = usePermissions();
   const { data: provider, isPending, error } = useProvider(id);
   const update = useUpdateProvider(id);
-  const remove = useDeleteProvider();
+  const [tab, setTab] = useState<TabKey>("profile");
 
   if (isPending) return <Skeleton className="h-96 w-full" />;
   if (error || !provider) return <p className="text-destructive">{error?.message ?? "Provider not found"}</p>;
 
   const canEdit = can("providers.update");
+  const activeServices = provider.services.filter((s) => s.linkActive);
 
   return (
-    <div className="grid gap-6">
-      <div>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{provider.displayName}</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <span>{provider.designation ?? PROVIDER_TYPE_LABELS[provider.providerType]}</span>
-              {provider.isActive ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">Inactive</Badge>}
-            </div>
-          </div>
-          {can("providers.delete") && (
-            <Button
-              variant="ghost"
-              className="text-destructive"
-              disabled={remove.isPending}
-              onClick={() => {
-                if (!window.confirm(`Delete ${provider.displayName}? They'll be removed from the booking form and admin lists; their past bookings and payments are kept.`)) return;
-                remove.mutate(provider.id, {
-                  onSuccess: () => {
-                    toast.success("Provider deleted");
-                    onClose();
-                  },
-                  onError: (e) => toast.error(errorText(e, "Could not delete")),
-                });
-              }}
-            >
-              <Trash2 className="size-4" /> Delete
-            </Button>
-          )}
-        </div>
-      </div>
+    <div className="grid gap-5">
+      <ProviderHeader provider={provider} />
+      <ReadinessStrip provider={provider} onJump={setTab} />
 
-      <Tabs defaultValue="profile">
-        <TabsList>
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="availability">Availability</TabsTrigger>
-        </TabsList>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
+        {/* Scrolls sideways on a phone instead of wrapping into a second row. */}
+        <div className="-mx-1 overflow-x-auto px-1">
+          <TabsList>
+            <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="services">Services{activeServices.length > 0 && ` (${activeServices.length})`}</TabsTrigger>
+            <TabsTrigger value="availability">Availability</TabsTrigger>
+            <TabsTrigger value="website">Website</TabsTrigger>
+            <TabsTrigger value="account">Account &amp; pay</TabsTrigger>
+          </TabsList>
+        </div>
+
         <TabsContent value="profile" className="mt-4 grid gap-6">
-          <WebsiteCalendarCard provider={provider} />
           <ProviderProfileForm provider={provider} mode="admin" readOnly={!canEdit} onSave={(body) => update.mutateAsync(body)} />
-          <div className="grid gap-6 lg:grid-cols-2">
-            <ServicesCard provider={provider} readOnly={!canEdit} />
-            <LoginCard provider={provider} canInvite={can("providers.update") && can("staff.create")} />
-          </div>
-          {can("invoices.view") && <PayslipsCard provider={provider} canCreate={can("invoices.create")} />}
+          {can("providers.delete") && <DangerZone provider={provider} onDeleted={onClose} />}
         </TabsContent>
+
+        <TabsContent value="services" className="mt-4 grid gap-6">
+          <ServicesCard provider={provider} readOnly={!canEdit} />
+          <ConcernOptionsCard provider={provider} readOnly={!can("services.manage_concern_options")} />
+        </TabsContent>
+
         <TabsContent value="availability" className="mt-4 grid gap-6">
           <SlotPreview provider={provider} />
           <AvailabilityEditor providerId={provider.id} readOnly={!can("availability.manage_all")} />
         </TabsContent>
+
+        <TabsContent value="website" className="mt-4 grid gap-6">
+          <WebsiteCalendarCard provider={provider} />
+        </TabsContent>
+
+        <TabsContent value="account" className="mt-4 grid gap-6">
+          <LoginCard provider={provider} canInvite={can("providers.update") && can("staff.create")} />
+          {can("invoices.view") && <PayslipsCard provider={provider} canCreate={can("invoices.create")} />}
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function ProviderHeader({ provider }: { provider: ProviderDto }) {
+  const accepts = provider.acceptsMale && provider.acceptsFemale ? "Male & female clients" : provider.acceptsMale ? "Male clients only" : "Female clients only";
+  return (
+    <div className="flex items-start gap-4">
+      <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
+        {provider.profileImageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- public image URL
+          <img src={provider.profileImageUrl} alt="" className="size-full object-cover" />
+        ) : (
+          <UserRound className="size-7 text-muted-foreground" />
+        )}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight">{provider.displayName}</h1>
+          {provider.isActive ? <Badge variant="secondary">Active</Badge> : <Badge variant="outline">Inactive</Badge>}
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {provider.designation ?? PROVIDER_TYPE_LABELS[provider.providerType]}
+          {" · "}
+          {provider.experienceYears} {provider.experienceYears === 1 ? "year" : "years"} experience
+          {provider.rating && (
+            <span className="ml-1 inline-flex items-center gap-0.5">
+              {" · "}
+              <Star className="size-3 fill-current" aria-hidden /> {provider.rating}
+            </span>
+          )}
+          {" · "}
+          {accepts}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** What stops this provider from being booked, at a glance; each chip jumps to where it is fixed. */
+function ReadinessStrip({ provider, onJump }: { provider: ProviderDto; onJump: (tab: TabKey) => void }) {
+  const activeServices = provider.services.filter((s) => s.linkActive);
+  const account = provider.account;
+  const showAreas = providerChecklistLabel(provider) !== null;
+  const activeAreas = provider.concernOptions.filter((o) => o.isActive).length;
+
+  const items: { ok: boolean | null; text: string; tab: TabKey }[] = [
+    { ok: provider.isActive, text: provider.isActive ? "Shown on booking forms" : "Hidden from booking forms", tab: "profile" },
+    {
+      ok: activeServices.length > 0,
+      text: activeServices.length > 0 ? `${activeServices.length} service${activeServices.length === 1 ? "" : "s"}` : "No service assigned",
+      tab: "services",
+    },
+    ...(showAreas
+      ? [{ ok: activeAreas > 0 ? true : null, text: activeAreas > 0 ? `${activeAreas} areas of concern` : "No areas of concern", tab: "services" as TabKey }]
+      : []),
+    {
+      ok: account ? (account.status === "ACTIVE" ? true : null) : null,
+      text: account ? (account.status === "ACTIVE" ? "Dashboard login active" : "Login invited") : "No dashboard login",
+      tab: "account",
+    },
+  ];
+
+  return (
+    <ul className="flex flex-wrap gap-2" aria-label="Booking readiness">
+      {items.map((i) => (
+        <li key={i.text}>
+          <button
+            type="button"
+            onClick={() => onJump(i.tab)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors hover:bg-accent",
+              i.ok === false && "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200",
+              i.ok === true && "text-foreground",
+              i.ok === null && "text-muted-foreground",
+            )}
+          >
+            {i.ok === true && <Check className="size-3.5 text-emerald-600" aria-hidden />}
+            {i.ok === false && <CircleAlert className="size-3.5" aria-hidden />}
+            {i.text}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function DangerZone({ provider, onDeleted }: { provider: ProviderDto; onDeleted: () => void }) {
+  const remove = useDeleteProvider();
+  return (
+    <Card className="border-destructive/30">
+      <CardHeader>
+        <CardTitle className="text-base">Delete provider</CardTitle>
+        <CardDescription>
+          Removes {provider.displayName} from the booking forms, availability and admin lists. Past bookings and payments are kept.
+        </CardDescription>
+      </CardHeader>
+      <CardFooter>
+        <Button
+          variant="outline"
+          className="text-destructive"
+          disabled={remove.isPending}
+          onClick={() => {
+            if (!window.confirm(`Delete ${provider.displayName}? They'll be removed from the booking form and admin lists; their past bookings and payments are kept.`)) return;
+            remove.mutate(provider.id, {
+              onSuccess: () => {
+                toast.success("Provider deleted");
+                onDeleted();
+              },
+              onError: (e) => toast.error(errorText(e, "Could not delete")),
+            });
+          }}
+        >
+          <Trash2 className="size-4" /> Delete provider
+        </Button>
+      </CardFooter>
+    </Card>
   );
 }
 

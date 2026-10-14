@@ -1,11 +1,9 @@
 import type {
   ConcernOptionDto,
-  CreateConcernOptionInput,
   CreatePackageInput,
   PackageDto,
   ServiceDto,
   SetServiceProvidersInput,
-  UpdateConcernOptionInput,
   UpdatePackageInput,
   UpdateServiceInput,
 } from "@booking/shared";
@@ -193,68 +191,6 @@ export async function deletePackage(principal: Principal, idOrSlug: string, pack
     if (used) throw AppError.conflict("This option has bookings. Switch it off instead of deleting it.");
     await tx.servicePackage.delete({ where: { id: packageId } });
     await recordAudit(tx, ctx, { action: "package.delete", entityType: "service_package", entityId: packageId, oldValues: pkg });
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Concern-checklist options ("Areas of concern" etc. — admin-managed per service)
-// ---------------------------------------------------------------------------
-
-export async function createConcernOption(principal: Principal, idOrSlug: string, input: CreateConcernOptionInput, ctx: AuditContext) {
-  return prisma.$transaction(async (tx) => {
-    const service = await loadService(tx, principal.organizationId, idOrSlug);
-    const clash = service.concernOptions.some((o) => o.code === input.code);
-    if (clash) throw AppError.conflict(`"${input.code}" already exists for this service`);
-    const row = await tx.serviceConcernOption.create({
-      data: {
-        serviceId: service.id,
-        code: input.code,
-        label: input.label,
-        isActive: input.isActive ?? true,
-        sortOrder: input.sortOrder ?? service.concernOptions.length,
-      },
-    });
-    await recordAudit(tx, ctx, { action: "concern_option.create", entityType: "service_concern_option", entityId: row.id, newValues: input });
-    return toConcernOptionDto(row);
-  });
-}
-
-async function loadConcernOption(db: DbClient, organizationId: string, idOrSlug: string, optionId: string) {
-  const service = await loadService(db, organizationId, idOrSlug);
-  const option = service.concernOptions.find((o) => o.id === optionId);
-  if (!option) throw AppError.notFound("Option");
-  return { service, option };
-}
-
-export async function updateConcernOption(
-  principal: Principal,
-  idOrSlug: string,
-  optionId: string,
-  input: UpdateConcernOptionInput,
-  ctx: AuditContext,
-) {
-  return prisma.$transaction(async (tx) => {
-    const { service, option } = await loadConcernOption(tx, principal.organizationId, idOrSlug, optionId);
-    if (input.code && input.code !== option.code && service.concernOptions.some((o) => o.code === input.code)) {
-      throw AppError.conflict(`"${input.code}" already exists for this service`);
-    }
-    const after = await tx.serviceConcernOption.update({ where: { id: optionId }, data: definedOnly(input) });
-    await recordAudit(tx, ctx, {
-      action: "concern_option.update",
-      entityType: "service_concern_option",
-      entityId: optionId,
-      oldValues: toConcernOptionDto(option),
-      newValues: input,
-    });
-    return toConcernOptionDto(after);
-  });
-}
-
-export async function deleteConcernOption(principal: Principal, idOrSlug: string, optionId: string, ctx: AuditContext) {
-  await prisma.$transaction(async (tx) => {
-    const { option } = await loadConcernOption(tx, principal.organizationId, idOrSlug, optionId);
-    await tx.serviceConcernOption.delete({ where: { id: optionId } });
-    await recordAudit(tx, ctx, { action: "concern_option.delete", entityType: "service_concern_option", entityId: optionId, oldValues: option });
   });
 }
 

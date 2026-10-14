@@ -54,9 +54,9 @@ export function checklistWithOther<const V extends readonly [string, ...string[]
 
 /**
  * Same shape as `checklistWithOther`, but for a checklist whose OPTIONS are
- * admin-managed per service (see ServiceConcernOption) rather than fixed in
+ * admin-managed per provider (see ProviderConcernOption) rather than fixed in
  * code — so the codes can't be statically enum-checked here. The API
- * re-validates each selected code against the service's current active
+ * re-validates each selected code against the chosen provider's current active
  * options at submission time. "Other" always stays available regardless.
  */
 export function checklistWithOtherDynamic() {

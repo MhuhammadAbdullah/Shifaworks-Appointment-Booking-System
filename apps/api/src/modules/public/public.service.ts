@@ -120,11 +120,6 @@ export async function getServiceBootstrap(slug: string): Promise<PublicServiceDt
         orderBy: [{ sortOrder: "asc" }, { price: "asc" }],
         select: publicPackageSelect,
       },
-      concernOptions: {
-        where: { isActive: true },
-        orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
-        select: { code: true, label: true },
-      },
     },
   });
   if (!service) throw AppError.notFound("Service");
@@ -138,7 +133,8 @@ export async function getServiceBootstrap(slug: string): Promise<PublicServiceDt
     currency: service.currency,
     termsUrl: settings.termsUrl,
     packages: service.packages.map((p) => toPublicPackage(p, service.defaultDurationMinutes)),
-    concernOptions: service.concernOptions,
+    // The checklist now belongs to the chosen provider (see listPublicProviders); kept empty for older booking sites.
+    concernOptions: [],
     deliveryModeVisible: service.deliveryModeVisible,
     support: { email: settings.supportEmail, phone: settings.supportPhone, whatsapp: settings.whatsappNumber },
     paymentInstructions: paymentInstructionsOf(settings),
@@ -160,7 +156,16 @@ export async function listPublicProviders(slug: ServiceSlug, gender: Gender | un
       services: { some: { serviceId, isActive: true } },
       ...(gender === "MALE" ? { acceptsMale: true } : gender === "FEMALE" ? { acceptsFemale: true } : {}),
     },
-    select: { id: true, slug: true, displayName: true, designation: true, experienceYears: true, rating: true, profileImage: fileUrlSelect },
+    select: {
+      id: true,
+      slug: true,
+      displayName: true,
+      designation: true,
+      experienceYears: true,
+      rating: true,
+      profileImage: fileUrlSelect,
+      concernOptions: { where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { label: "asc" }], select: { code: true, label: true } },
+    },
     orderBy: [{ sortOrder: "asc" }, { displayName: "asc" }],
     take: 100,
   });
@@ -172,6 +177,7 @@ export async function listPublicProviders(slug: ServiceSlug, gender: Gender | un
     experienceYears: p.experienceYears,
     rating: p.rating === null ? null : p.rating.toFixed(1),
     photoUrl: publicFileUrl(p.profileImage),
+    concernOptions: p.concernOptions,
   }));
 }
 
@@ -272,16 +278,16 @@ const serviceGuessSchema = z.object({ service: z.string() });
 /**
  * The checklist's own Zod shape (checklistWithOtherDynamic) can't enum-check
  * codes since they're admin-managed, not fixed — so every non-"OTHER" code
- * is checked against the service's currently-active options here instead.
+ * is checked against the chosen provider's currently-active options here instead.
  */
-async function assertValidConcernSelection(serviceId: string, input: AnyBookingInput): Promise<void> {
+async function assertValidConcernSelection(providerId: string, input: AnyBookingInput): Promise<void> {
   const field = CONCERN_CHECKLIST_FIELD[input.service];
   if (!field) return;
   const details = input.details as Record<string, { selected: string[] } | undefined>;
   const codes = (details[field]?.selected ?? []).filter((c) => c !== "OTHER");
   if (codes.length === 0) return;
-  const active = await prisma.serviceConcernOption.findMany({
-    where: { serviceId, isActive: true, code: { in: codes } },
+  const active = await prisma.providerConcernOption.findMany({
+    where: { providerId, isActive: true, code: { in: codes } },
     select: { code: true },
   });
   const activeSet = new Set(active.map((o) => o.code));
@@ -317,7 +323,7 @@ export async function submitPublicBooking(rawBody: unknown, idempotencyKey: stri
 
   const organization = await getPublicOrganization();
   const serviceId = await resolveServiceId(organization.id, input.service);
-  await assertValidConcernSelection(serviceId, input);
+  await assertValidConcernSelection(input.providerId, input);
   const settings = await getOrgSettings(organization.id);
 
   const result = await createAppointmentBooking({

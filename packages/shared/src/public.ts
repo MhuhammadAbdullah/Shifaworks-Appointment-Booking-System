@@ -33,7 +33,7 @@ export interface PaymentInstructionsDto {
   instructions: string;
 }
 
-/** An admin-managed "Areas of concern" style checklist option — only active ones are ever sent to the browser. */
+/** A provider's own "Areas of concern" style checklist option — only active ones are ever sent to the browser. */
 export interface PublicConcernOptionDto {
   code: string;
   label: string;
@@ -63,7 +63,7 @@ export interface PublicServiceDto {
   currency: string;
   termsUrl: string;
   packages: PublicPackageDto[];
-  /** Empty for services with no admin-managed checklist (see CONCERN_CHECKLIST_FIELD). */
+  /** @deprecated Always empty now: the checklist comes from the chosen provider (PublicProviderDto.concernOptions). Kept so a not-yet-updated booking site keeps working. */
   concernOptions: PublicConcernOptionDto[];
   /** Whether the "In person or online" question should be asked at all. */
   deliveryModeVisible: boolean;
@@ -82,6 +82,8 @@ export interface PublicProviderDto {
   /** "4.8" or null when the provider has no rating yet — hide the stars. */
   rating: string | null;
   photoUrl: string | null;
+  /** What this provider covers on the "Areas of concern" question. Empty = customers see only "Other". */
+  concernOptions: PublicConcernOptionDto[];
 }
 
 /** A WordPress team page's mapping key. Same shape `resolveSlug` produces; checked here so junk never reaches the DB. */

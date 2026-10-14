@@ -47,9 +47,13 @@ export interface ServiceProviderSummary {
   linkActive: boolean;
 }
 
+/**
+ * One checklist choice on an "Areas of concern" style question. `serviceId` is only set on the old
+ * service-level rows (read-only, kept as a label fallback for bookings made before options moved to providers).
+ */
 export interface ConcernOptionDto {
   id: string;
-  serviceId: string;
+  serviceId?: string;
   code: string;
   label: string;
   isActive: boolean;
@@ -126,7 +130,7 @@ export const setServiceProvidersSchema = z.object({
 });
 export type SetServiceProvidersInput = z.infer<typeof setServiceProvidersSchema>;
 
-// "Areas of concern" style checklist options (clinical/faith-based counseling, life coaching) --------
+// "Areas of concern" style checklist options (clinical/faith-based counseling, life coaching), managed per provider --------
 
 const concernOptionFields = {
   code: z
@@ -174,6 +178,8 @@ export interface ProviderDto {
   isActive: boolean;
   sortOrder: number;
   services: { id: string; slug: string; name: string; linkActive: boolean }[];
+  /** This provider's own "Areas of concern" checklist (all rows, hidden ones included). */
+  concernOptions: ConcernOptionDto[];
   /** The dashboard login, once invited. */
   account: { userId: string; email: string | null; status: UserStatus; hasLogin: boolean } | null;
 }

@@ -1,16 +1,21 @@
 import { Router, type RequestHandler } from "express";
+import { z } from "zod";
 import {
+  createConcernOptionSchema,
   createProviderSchema,
   idParamSchema,
   inviteProviderSchema,
   listProvidersQuerySchema,
   setProviderServicesSchema,
+  updateConcernOptionSchema,
   updateOwnProviderSchema,
   updateProviderSchema,
+  type CreateConcernOptionInput,
   type CreateProviderInput,
   type InviteProviderInput,
   type ListProvidersQuery,
   type SetProviderServicesInput,
+  type UpdateConcernOptionInput,
   type UpdateOwnProviderInput,
   type UpdateProviderInput,
 } from "@booking/shared";
@@ -22,6 +27,8 @@ import { auditContextFrom } from "../audit/audit.service.js";
 import * as service from "./providers.service.js";
 
 type IdParams = { id: string };
+const optionParams = idParamSchema.extend({ optionId: z.uuid() });
+type OptionParams = z.infer<typeof optionParams>;
 
 export const providersRouter = Router();
 providersRouter.use(requireAuth);
@@ -95,5 +102,37 @@ providersRouter.post(
   async (req, res) => {
     const { body, params } = validated<InviteProviderInput, unknown, IdParams>(req);
     sendOk(res, await service.inviteProvider(principalOf(req), params.id, body, auditContextFrom(req)), "Invitation sent");
+  },
+);
+
+// "Areas of concern" checklist: each provider's own list (same permission that used to guard the service-level list).
+providersRouter.post(
+  "/:id/concern-options",
+  requirePermission("services.manage_concern_options"),
+  validate({ params: idParamSchema, body: createConcernOptionSchema }),
+  async (req, res) => {
+    const { body, params } = validated<CreateConcernOptionInput, unknown, IdParams>(req);
+    sendCreated(res, await service.createConcernOption(principalOf(req), params.id, body, auditContextFrom(req)), "Added");
+  },
+);
+
+providersRouter.patch(
+  "/:id/concern-options/:optionId",
+  requirePermission("services.manage_concern_options"),
+  validate({ params: optionParams, body: updateConcernOptionSchema }),
+  async (req, res) => {
+    const { body, params } = validated<UpdateConcernOptionInput, unknown, OptionParams>(req);
+    sendOk(res, await service.updateConcernOption(principalOf(req), params.id, params.optionId, body, auditContextFrom(req)), "Saved");
+  },
+);
+
+providersRouter.delete(
+  "/:id/concern-options/:optionId",
+  requirePermission("services.manage_concern_options"),
+  validate({ params: optionParams }),
+  async (req, res) => {
+    const { params } = validated<unknown, unknown, OptionParams>(req);
+    await service.deleteConcernOption(principalOf(req), params.id, params.optionId, auditContextFrom(req));
+    sendNoContent(res);
   },
 );

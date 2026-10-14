@@ -6,7 +6,7 @@ import { useForm, type DefaultValues, type FieldPath, type Resolver } from "reac
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import type { z } from "zod";
-import { SERVICE_DEFINITIONS, type PublicPackageDto, type PublicProviderDto, type ServiceSlug } from "@booking/shared";
+import { CONCERN_CHECKLIST_FIELD, SERVICE_DEFINITIONS, type PublicPackageDto, type PublicProviderDto, type ServiceSlug } from "@booking/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -101,6 +101,17 @@ export function BookingWizard<TValues extends BaseBookingValues>({
     return <p className="mx-auto max-w-2xl text-center text-sm text-destructive">{bootstrap.error?.message ?? "This form is unavailable."}</p>;
   }
   const service = bootstrap.data;
+  // "Areas of concern" is the provider's own list: the details step shows the chosen provider's options.
+  const serviceForDetails = { ...service, concernOptions: provider?.concernOptions ?? [] };
+
+  function selectProvider(next: PublicProviderDto) {
+    const field = CONCERN_CHECKLIST_FIELD[slug];
+    // A different provider covers different areas: drop ticks that may not exist on the new list.
+    if (field && provider && provider.id !== next.id) {
+      form.setValue(`details.${field}` as FieldPath<TValues>, { selected: [], otherDetail: "" } as never, { shouldDirty: true });
+    }
+    setProvider(next);
+  }
 
   if (result) {
     return (
@@ -125,13 +136,13 @@ export function BookingWizard<TValues extends BaseBookingValues>({
         <YourDetailsStep
           form={form}
           slug={slug}
-          service={service}
+          service={serviceForDetails}
           providerNoun={definition.providerNoun}
           packageNoun={definition.packageNoun}
           detailsLabel={detailsLabel}
           DetailsStep={DetailsStep}
           preselectProviderSlug={prefill.providerSlug}
-          onProviderSelect={setProvider}
+          onProviderSelect={selectProvider}
           onPackageSelect={setPkg}
         />
       ),
@@ -152,7 +163,16 @@ export function BookingWizard<TValues extends BaseBookingValues>({
 
   async function goNext() {
     const ok = await form.trigger(current.field);
-    if (!ok) return;
+    if (!ok) {
+      // The first step is a long page: take the visitor to the first problem instead of leaving it off-screen.
+      toast.error("Please check the highlighted fields.");
+      window.requestAnimationFrame(() => {
+        const bad = document.querySelector<HTMLElement>('[aria-invalid="true"], p.text-destructive');
+        bad?.scrollIntoView({ block: "center", behavior: "smooth" });
+        if (bad && bad.getAttribute("aria-invalid") === "true") bad.focus({ preventScroll: true });
+      });
+      return;
+    }
     if (step < last) {
       setStep((s) => s + 1);
       return;
@@ -168,7 +188,7 @@ export function BookingWizard<TValues extends BaseBookingValues>({
 
   return (
     <div className="mx-auto w-full max-w-2xl">
-      <WizardHeader step={step} total={STEPS.length} label={current.label} title={title} />
+      <WizardHeader step={step} labels={STEPS.map((s) => s.label)} title={title} />
       {step === 0 && prefill.startsAt && pkg && chosenStart === prefill.startsAt && (
         <p className="mb-3 rounded-md border bg-muted/40 p-3 text-sm">
           You chose {formatDate(prefill.startsAt, timezone)} at {formatTime12(prefill.startsAt, timezone)}. Fill in your details and we&apos;ll
@@ -180,7 +200,8 @@ export function BookingWizard<TValues extends BaseBookingValues>({
           {current.node}
           <HoneypotField form={form} />
         </CardContent>
-        <CardFooter className="justify-between">
+        {/* Stays visible at the bottom of the card while a long step is scrolled, so Next is always reachable. */}
+        <CardFooter className="sticky bottom-0 z-10 -mb-6 justify-between rounded-b-xl border-t bg-card/95 pb-4 pt-4 backdrop-blur">
           <Button type="button" variant="outline" onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0 || submit.isPending}>
             Back
           </Button>

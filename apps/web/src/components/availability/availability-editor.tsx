@@ -89,7 +89,8 @@ export function AvailabilityEditor({ providerId, readOnly = false }: { providerI
         </div>
       )}
       <CustomHoursCalendarCard providerId={providerId} availability={data} readOnly={readOnly} services={services} selectedServiceId={selectedServiceId} />
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* One under the other (each on its own row), not side by side. */}
+      <div className="grid gap-6">
         <ExceptionsCard providerId={providerId} availability={data} readOnly={readOnly} services={services} selectedServiceId={selectedServiceId} />
         <BlocksCard providerId={providerId} availability={data} readOnly={readOnly} />
       </div>

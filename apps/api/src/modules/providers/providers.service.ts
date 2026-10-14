@@ -1,8 +1,11 @@
 import type {
+  ConcernOptionDto,
+  CreateConcernOptionInput,
   CreateProviderInput,
   InviteProviderInput,
   ListProvidersQuery,
   ProviderDto,
+  UpdateConcernOptionInput,
   UpdateOwnProviderInput,
   UpdateProviderInput,
 } from "@booking/shared";
@@ -27,8 +30,14 @@ const providerInclude = {
     select: { isActive: true, service: { select: { id: true, slug: true, name: true, sortOrder: true } } },
     orderBy: { service: { sortOrder: "asc" } },
   },
+  concernOptions: { orderBy: [{ sortOrder: "asc" }, { label: "asc" }] },
 } as const satisfies Prisma.ProviderProfileInclude;
 type ProviderRow = Prisma.ProviderProfileGetPayload<{ include: typeof providerInclude }>;
+type ConcernOptionRow = ProviderRow["concernOptions"][number];
+
+function toConcernOptionDto(o: ConcernOptionRow): ConcernOptionDto {
+  return { id: o.id, code: o.code, label: o.label, isActive: o.isActive, sortOrder: o.sortOrder };
+}
 
 function toDto(p: ProviderRow): ProviderDto {
   return {
@@ -53,6 +62,7 @@ function toDto(p: ProviderRow): ProviderDto {
     isActive: p.isActive,
     sortOrder: p.sortOrder,
     services: p.services.map((s) => ({ id: s.service.id, slug: s.service.slug, name: s.service.name, linkActive: s.isActive })),
+    concernOptions: p.concernOptions.map(toConcernOptionDto),
     account: p.user
       ? { userId: p.user.id, email: p.user.email, status: p.user.status, hasLogin: p.user.authUserId !== null }
       : null,
@@ -344,4 +354,65 @@ export async function inviteProvider(principal: Principal, id: string, input: In
   if (existing && !existing.authUserId) await sendInvite(principal, existing.id, ctx);
   if (userId) invalidatePrincipal(userId);
   return getProvider(principal, id);
+}
+
+// ---------------------------------------------------------------------------
+// "Areas of concern" checklist options: each provider covers a different set
+// ---------------------------------------------------------------------------
+
+async function loadConcernOption(db: DbClient, organizationId: string, providerId: string, optionId: string) {
+  const provider = await loadProvider(db, organizationId, providerId);
+  const option = provider.concernOptions.find((o) => o.id === optionId);
+  if (!option) throw AppError.notFound("Option");
+  return { provider, option };
+}
+
+export async function createConcernOption(principal: Principal, providerId: string, input: CreateConcernOptionInput, ctx: AuditContext) {
+  return prisma.$transaction(async (tx) => {
+    const provider = await loadProvider(tx, principal.organizationId, providerId);
+    if (provider.concernOptions.some((o) => o.code === input.code)) throw AppError.conflict(`"${input.code}" already exists for this provider`);
+    const row = await tx.providerConcernOption.create({
+      data: {
+        providerId: provider.id,
+        code: input.code,
+        label: input.label,
+        isActive: input.isActive ?? true,
+        sortOrder: input.sortOrder ?? provider.concernOptions.length,
+      },
+    });
+    await recordAudit(tx, ctx, { action: "concern_option.create", entityType: "provider_concern_option", entityId: row.id, newValues: input });
+    return toConcernOptionDto(row);
+  });
+}
+
+export async function updateConcernOption(
+  principal: Principal,
+  providerId: string,
+  optionId: string,
+  input: UpdateConcernOptionInput,
+  ctx: AuditContext,
+) {
+  return prisma.$transaction(async (tx) => {
+    const { provider, option } = await loadConcernOption(tx, principal.organizationId, providerId, optionId);
+    if (input.code && input.code !== option.code && provider.concernOptions.some((o) => o.code === input.code)) {
+      throw AppError.conflict(`"${input.code}" already exists for this provider`);
+    }
+    const after = await tx.providerConcernOption.update({ where: { id: optionId }, data: definedOnly(input) });
+    await recordAudit(tx, ctx, {
+      action: "concern_option.update",
+      entityType: "provider_concern_option",
+      entityId: optionId,
+      oldValues: toConcernOptionDto(option),
+      newValues: input,
+    });
+    return toConcernOptionDto(after);
+  });
+}
+
+export async function deleteConcernOption(principal: Principal, providerId: string, optionId: string, ctx: AuditContext) {
+  await prisma.$transaction(async (tx) => {
+    const { option } = await loadConcernOption(tx, principal.organizationId, providerId, optionId);
+    await tx.providerConcernOption.delete({ where: { id: optionId } });
+    await recordAudit(tx, ctx, { action: "concern_option.delete", entityType: "provider_concern_option", entityId: optionId, oldValues: toConcernOptionDto(option) });
+  });
 }
