@@ -1,0 +1,66 @@
+/* ShifaWorks availability calendar. Every rule is scoped to .shifa-av so the theme and Elementor are left alone. */
+.shifa-av {
+	--shifa-accent: #86c242;
+	--shifa-accent-dark: #72a538;
+	--shifa-ink: #14210a;
+	--shifa-border: #d9dde3;
+	--shifa-muted: #5f6b7a;
+	box-sizing: border-box;
+	max-width: 640px;
+	font-size: 15px;
+	line-height: 1.4;
+	color: inherit;
+}
+.shifa-av *, .shifa-av *::before, .shifa-av *::after { box-sizing: inherit; }
+
+.shifa-av__title { margin: 0 0 8px; font-size: 1.25em; }
+.shifa-av__note, .shifa-av__hint, .shifa-av__zone { margin: 6px 0; color: var(--shifa-muted); font-size: 0.93em; }
+.shifa-av__error { margin: 8px 0; padding: 8px 10px; border-radius: 6px; background: #fdecea; color: #8a1f17; }
+.shifa-av__admin { margin: 0 0 12px; padding: 8px 10px; border-left: 4px solid #dba617; background: #fff8e5; color: #5c4400; font-size: 0.9em; }
+
+.shifa-av__button {
+	display: inline-block;
+	padding: 10px 20px;
+	border-radius: 6px;
+	background: var(--shifa-accent);
+	color: var(--shifa-ink);
+	font-weight: 600;
+	text-decoration: none;
+}
+.shifa-av__button:hover, .shifa-av__button:focus { background: var(--shifa-accent-dark); color: var(--shifa-ink); }
+
+.shifa-av__pickers { display: grid; gap: 10px; margin: 10px 0; }
+.shifa-av__field { display: grid; gap: 4px; }
+.shifa-av__label { font-weight: 600; font-size: 0.9em; }
+.shifa-av__select { width: 100%; padding: 8px 10px; border: 1px solid var(--shifa-border); border-radius: 6px; background: #fff; color: #1d2530; font: inherit; }
+
+.shifa-av__layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); border: 1px solid var(--shifa-border); border-radius: 8px; overflow: hidden; background: #fff; color: #1d2530; }
+.shifa-av__calendar { padding: 12px; }
+.shifa-av__times { padding: 12px; border-left: 1px solid var(--shifa-border); max-height: 340px; overflow-y: auto; }
+
+.shifa-av__month { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.shifa-av__month-label { font-weight: 600; }
+.shifa-av__nav { width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; font-size: 20px; line-height: 1; cursor: pointer; color: inherit; }
+.shifa-av__nav:hover:not(:disabled) { background: #eef1f4; }
+.shifa-av__nav:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.shifa-av__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; text-align: center; }
+.shifa-av__weekday { padding: 4px 0; font-size: 11px; color: var(--shifa-muted); }
+.shifa-av__day { aspect-ratio: 1; padding: 0; border: 0; border-radius: 6px; background: transparent; font: inherit; color: #9aa3ae; cursor: not-allowed; }
+.shifa-av__day.is-open { color: #1d2530; font-weight: 600; cursor: pointer; background: #f1f7e9; }
+.shifa-av__day.is-open:hover { background: #dff0c8; }
+.shifa-av__day.is-full { text-decoration: line-through; }
+.shifa-av__day.is-active { background: var(--shifa-accent); color: var(--shifa-ink); }
+
+.shifa-av__times-title { margin: 0 0 8px; font-weight: 600; text-align: center; }
+.shifa-av__slots { display: grid; gap: 8px; }
+.shifa-av__slot { padding: 9px 10px; border: 1px solid var(--shifa-border); border-radius: 6px; background: #fff; font: inherit; color: #1d2530; cursor: pointer; }
+.shifa-av__slot:hover, .shifa-av__slot:focus { background: var(--shifa-accent); border-color: var(--shifa-accent); color: var(--shifa-ink); }
+
+.shifa-av button:focus-visible, .shifa-av select:focus-visible, .shifa-av a:focus-visible { outline: 2px solid #2271b1; outline-offset: 2px; }
+
+@media (max-width: 600px) {
+	.shifa-av__layout { grid-template-columns: 1fr; }
+	.shifa-av__times { border-left: 0; border-top: 1px solid var(--shifa-border); max-height: none; }
+	.shifa-av__slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
