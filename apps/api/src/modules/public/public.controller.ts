@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import type { PublicAvailableDatesQuery, PublicProvidersQuery, PublicSlotsQuery } from "@booking/shared";
+import type { PublicAvailableDatesQuery, PublicProvidersQuery, PublicSlotsQuery, PublicTeamSlugParam } from "@booking/shared";
 import { validated } from "../../middleware/validate.js";
 import { sendCreated, sendOk } from "../../utils/api-response.js";
 import { AppError } from "../../utils/app-error.js";
@@ -18,6 +18,14 @@ export const getService: RequestHandler = async (req, res) => {
 export const listProviders: RequestHandler = async (req, res) => {
   const { query } = validated<unknown, PublicProvidersQuery>(req);
   sendOk(res, await service.listPublicProviders(query.service, query.gender));
+};
+
+export const teamProfile: RequestHandler = async (req, res) => {
+  const { params } = validated<unknown, unknown, PublicTeamSlugParam>(req);
+  // Availability moves with every booking and dashboard edit, but a provider's name/services/packages don't:
+  // a short browser/CDN cache keeps a busy team page from re-querying them on every visit.
+  res.setHeader("Cache-Control", "public, max-age=60");
+  sendOk(res, await service.getTeamProfile(params.slug));
 };
 
 export const availableDates: RequestHandler = async (req, res) => {

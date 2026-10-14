@@ -1,7 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { ipKeyGenerator, rateLimit } from "express-rate-limit";
-import { publicAvailableDatesQuerySchema, publicProvidersQuerySchema, publicSlotsQuerySchema, type ApiFailure } from "@booking/shared";
+import { publicAvailableDatesQuerySchema, publicProvidersQuerySchema, publicSlotsQuerySchema, publicTeamSlugParamSchema, type ApiFailure } from "@booking/shared";
 import { env } from "../../config/env.js";
 import { validate } from "../../middleware/validate.js";
 import * as controller from "./public.controller.js";
@@ -17,6 +17,7 @@ export const publicRouter = Router();
 publicRouter.get("/branding", controller.getBranding);
 publicRouter.get("/services/:slug", controller.getService);
 publicRouter.get("/providers", validate({ query: publicProvidersQuerySchema }), controller.listProviders);
+publicRouter.get("/team/:slug", validate({ params: publicTeamSlugParamSchema }), controller.teamProfile);
 publicRouter.get("/availability/dates", validate({ query: publicAvailableDatesQuerySchema }), controller.availableDates);
 publicRouter.get("/availability/slots", validate({ query: publicSlotsQuerySchema }), controller.slots);
 

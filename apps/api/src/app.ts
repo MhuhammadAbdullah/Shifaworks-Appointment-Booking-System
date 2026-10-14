@@ -38,6 +38,26 @@ export function createApp(): Express {
   );
 
   app.use(helmet());
+
+  // Read-only CORS for the WordPress availability calendar. Mounted before the general policy below
+  // so the preflight for an allowed WordPress origin is answered here; every other origin (and every
+  // other route, including POST /public/bookings) falls through to the general policy untouched.
+  const widgetCors = cors({
+    origin: env.PUBLIC_CORS_ORIGINS,
+    credentials: false,
+    methods: ["GET", "HEAD", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "X-Request-Id"],
+    exposedHeaders: ["X-Request-Id"],
+    maxAge: 600,
+  });
+  if (env.PUBLIC_CORS_ORIGINS.length) {
+    app.use(["/api/v1/public/team", "/api/v1/public/availability"], (req, res, next) => {
+      const origin = req.headers.origin;
+      if (origin && env.PUBLIC_CORS_ORIGINS.includes(origin)) return widgetCors(req, res, next);
+      next();
+    });
+  }
+
   app.use(
     cors({
       origin: (origin, cb) => {

@@ -9,16 +9,21 @@ import {
   type PublicAvailableDatesQuery,
   type PublicBookingResponse,
   type PublicBrandingDto,
+  type PublicPackageDto,
   type PublicProviderDto,
   type PublicServiceDto,
   type PublicSlotsQuery,
+  type PublicTeamProfileDto,
+  type PublicTeamServiceDto,
   type ServiceSlug,
 } from "@booking/shared";
 import { prisma } from "../../lib/prisma.js";
+import type { Prisma } from "../../generated/prisma/client.js";
 import { getOrgSettings } from "../../lib/settings.js";
 import { getPublicOrganization } from "../../lib/organization.js";
 import { AppError } from "../../utils/app-error.js";
 import { money } from "../../utils/serialize.js";
+import { loadProviderContexts } from "../availability/availability.repository.js";
 import { availableDates as computeAvailableDates, slotsForDate as computeSlotsForDate } from "../availability/availability.service.js";
 import { fileUrlSelect, publicFileUrl, uploadPrivateFileAnonymous, type UploadedFile } from "../files/files.service.js";
 import { createAppointmentBooking } from "../appointments/booking-engine.js";
@@ -59,6 +64,43 @@ export async function uploadPublicReceipt(file: UploadedFile, partialCtx: Omit<A
 // Service bootstrap
 // ---------------------------------------------------------------------------
 
+const publicPackageSelect = {
+  id: true,
+  name: true,
+  description: true,
+  points: true,
+  durationMinutes: true,
+  price: true,
+  discountEnabled: true,
+  discountPercent: true,
+} as const;
+
+function toPublicPackage(
+  p: {
+    id: string;
+    name: string;
+    description: string | null;
+    points: number | null;
+    durationMinutes: number | null;
+    price: Prisma.Decimal;
+    discountEnabled: boolean;
+    discountPercent: Prisma.Decimal | null;
+  },
+  defaultDurationMinutes: number,
+): PublicPackageDto {
+  const discounted = p.discountEnabled && p.discountPercent ? p.price.minus(p.price.mul(p.discountPercent).div(100)) : null;
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    points: p.points,
+    durationMinutes: p.durationMinutes ?? defaultDurationMinutes,
+    price: money(discounted ?? p.price),
+    originalPrice: discounted ? money(p.price) : null,
+    discountPercent: p.discountEnabled ? (p.discountPercent?.toNumber() ?? null) : null,
+  };
+}
+
 export async function getServiceBootstrap(slug: string): Promise<PublicServiceDto> {
   if (!isServiceSlug(slug)) throw AppError.notFound("Service");
   const organization = await getPublicOrganization();
@@ -76,7 +118,7 @@ export async function getServiceBootstrap(slug: string): Promise<PublicServiceDt
       packages: {
         where: { isActive: true },
         orderBy: [{ sortOrder: "asc" }, { price: "asc" }],
-        select: { id: true, name: true, description: true, points: true, durationMinutes: true, price: true, discountEnabled: true, discountPercent: true },
+        select: publicPackageSelect,
       },
       concernOptions: {
         where: { isActive: true },
@@ -95,19 +137,7 @@ export async function getServiceBootstrap(slug: string): Promise<PublicServiceDt
     providerType: service.providerType ?? SERVICE_DEFINITIONS[slug].providerType,
     currency: service.currency,
     termsUrl: settings.termsUrl,
-    packages: service.packages.map((p) => {
-      const discounted = p.discountEnabled && p.discountPercent ? p.price.minus(p.price.mul(p.discountPercent).div(100)) : null;
-      return {
-        id: p.id,
-        name: p.name,
-        description: p.description,
-        points: p.points,
-        durationMinutes: p.durationMinutes ?? service.defaultDurationMinutes,
-        price: money(discounted ?? p.price),
-        originalPrice: discounted ? money(p.price) : null,
-        discountPercent: p.discountEnabled ? (p.discountPercent?.toNumber() ?? null) : null,
-      };
-    }),
+    packages: service.packages.map((p) => toPublicPackage(p, service.defaultDurationMinutes)),
     concernOptions: service.concernOptions,
     deliveryModeVisible: service.deliveryModeVisible,
     support: { email: settings.supportEmail, phone: settings.supportPhone, whatsapp: settings.whatsappNumber },
@@ -130,18 +160,83 @@ export async function listPublicProviders(slug: ServiceSlug, gender: Gender | un
       services: { some: { serviceId, isActive: true } },
       ...(gender === "MALE" ? { acceptsMale: true } : gender === "FEMALE" ? { acceptsFemale: true } : {}),
     },
-    select: { id: true, displayName: true, designation: true, experienceYears: true, rating: true, profileImage: fileUrlSelect },
+    select: { id: true, slug: true, displayName: true, designation: true, experienceYears: true, rating: true, profileImage: fileUrlSelect },
     orderBy: [{ sortOrder: "asc" }, { displayName: "asc" }],
     take: 100,
   });
   return rows.map((p) => ({
     id: p.id,
+    slug: p.slug,
     displayName: p.displayName,
     designation: p.designation,
     experienceYears: p.experienceYears,
     rating: p.rating === null ? null : p.rating.toFixed(1),
     photoUrl: publicFileUrl(p.profileImage),
   }));
+}
+
+// ---------------------------------------------------------------------------
+// Team profile (WordPress availability calendar)
+// ---------------------------------------------------------------------------
+
+/**
+ * What a WordPress team page needs to render a provider's calendar: who they
+ * are, the services they currently take online bookings for, and each
+ * service's active packages. An unknown, inactive or deleted provider is one
+ * and the same 404, so the endpoint can't be used to probe which slugs exist.
+ */
+export async function getTeamProfile(slug: string): Promise<PublicTeamProfileDto> {
+  const organization = await getPublicOrganization();
+  const provider = await prisma.providerProfile.findFirst({
+    where: { organizationId: organization.id, slug, isActive: true, deletedAt: null },
+    select: {
+      id: true,
+      slug: true,
+      displayName: true,
+      designation: true,
+      acceptsMale: true,
+      acceptsFemale: true,
+      profileImage: fileUrlSelect,
+      services: {
+        where: { isActive: true, service: { isActive: true, bookingEnabled: true } },
+        select: {
+          service: {
+            select: {
+              slug: true,
+              name: true,
+              sortOrder: true,
+              defaultDurationMinutes: true,
+              packages: { where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { price: "asc" }], select: publicPackageSelect },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!provider) throw AppError.notFound("Provider");
+
+  const contexts = await loadProviderContexts(prisma, organization.id, [provider.id], organization.timezone);
+  const services: PublicTeamServiceDto[] = provider.services
+    .map((s) => s.service)
+    .filter((s) => isServiceSlug(s.slug) && s.packages.length > 0)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
+    .map((s) => ({
+      slug: s.slug as ServiceSlug,
+      name: s.name,
+      packages: s.packages.map((p) => toPublicPackage(p, s.defaultDurationMinutes)),
+    }));
+
+  return {
+    id: provider.id,
+    slug: provider.slug,
+    displayName: provider.displayName,
+    designation: provider.designation,
+    photoUrl: publicFileUrl(provider.profileImage),
+    acceptsMale: provider.acceptsMale,
+    acceptsFemale: provider.acceptsFemale,
+    timezone: contexts.get(provider.id)?.timezone ?? organization.timezone,
+    services,
+  };
 }
 
 // ---------------------------------------------------------------------------

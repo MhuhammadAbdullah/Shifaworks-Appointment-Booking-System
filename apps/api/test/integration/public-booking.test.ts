@@ -25,6 +25,7 @@ import { createPackage } from "../../src/modules/services/services.service.js";
 import { setWeeklySchedule } from "../../src/modules/availability/availability.service.js";
 import {
   getServiceBootstrap,
+  getTeamProfile,
   listPublicProviders,
   publicAvailableDates,
   publicSlots,
@@ -364,6 +365,52 @@ describe("package discounts and receipt uploads (own provider/day, see note abov
   });
 });
 
+describe("team profile (WordPress availability calendar)", () => {
+  const app = createApp();
+  const slugOf = async (id: string) => (await prisma.providerProfile.findUniqueOrThrow({ where: { id }, select: { slug: true } })).slug;
+
+  it("returns only what the calendar needs: provider card, open services and their active packages", async () => {
+    const dto = await getTeamProfile(await slugOf(providerId));
+    expect(dto.id).toBe(providerId);
+    expect(dto.displayName).toBe(`${TAG} Provider`);
+    expect(dto.acceptsMale).toBe(true);
+    expect(dto.acceptsFemale).toBe(false);
+    expect(dto.timezone).toBe(TZ);
+    const hijama = dto.services.find((s) => s.slug === "hijama-therapy");
+    expect(hijama?.packages.some((p) => p.id === packageId)).toBe(true);
+    expect(hijama?.packages.some((p) => p.id === inactivePackageId)).toBe(false);
+    // Exactly the intended public fields - a new column added to the provider table never leaks through by accident.
+    expect(Object.keys(dto).sort()).toEqual(["acceptsFemale", "acceptsMale", "designation", "displayName", "id", "photoUrl", "services", "slug", "timezone"]);
+    expect(Object.keys(hijama!).sort()).toEqual(["name", "packages", "slug"]);
+    expect(Object.keys(hijama!.packages[0]!).sort()).toEqual(
+      ["description", "discountPercent", "durationMinutes", "id", "name", "originalPrice", "points", "price"],
+    );
+  });
+
+  it("is a 404 for an unknown slug and for an inactive provider alike", async () => {
+    const unknown = await errorOf(getTeamProfile(`${TAG}-nobody`));
+    const inactive = await errorOf(getTeamProfile(await slugOf(inactiveProviderId)));
+    expect(unknown.code).toBe("NOT_FOUND");
+    expect(inactive.code).toBe("NOT_FOUND");
+    expect(inactive.message).toBe(unknown.message);
+  });
+
+  it("lists the provider's slug on the public provider cards", async () => {
+    const forMale = await listPublicProviders("hijama-therapy", "MALE");
+    expect(forMale.find((p) => p.id === providerId)?.slug).toBe(await slugOf(providerId));
+  });
+
+  it("GET /public/team/:slug works end to end and rejects a malformed slug before touching the database", async () => {
+    const ok = await request(app).get(`/api/v1/public/team/${await slugOf(providerId)}`);
+    expect(ok.status).toBe(200);
+    expect(ok.body.data.id).toBe(providerId);
+    expect(ok.headers["cache-control"]).toContain("max-age");
+
+    expect((await request(app).get(`/api/v1/public/team/${TAG}-nobody`)).status).toBe(404);
+    expect((await request(app).get("/api/v1/public/team/Not%20A%20Slug!")).status).toBe(422);
+  });
+});
+
 // Everything above calls the service layer directly. This block goes through
 // the real Express app (routes â†’ middleware â†’ controller â†’ service) at least
 // once per endpoint, so a wiring mistake — e.g. a route param the controller
@@ -413,5 +460,53 @@ describe("HTTP wiring", () => {
       .send(body({ startsAt: at("14:00"), website: "http://spam.example" }));
     expect(res.status).toBe(422);
     expect(res.body.code).toBe("VALIDATION_ERROR");
+  });
+});
+
+// A calendar (WordPress profile or booking form) can show a time that someone else books a moment
+// later. The visitor then arrives with that now-stale time: it must be refused with a clear message,
+// and the calendar must stop offering it.
+describe("stale slots (own provider/day)", () => {
+  let wednesdayProviderId: string;
+  const wednesday = DateTime.fromISO(monday, { zone: TZ }).plus({ days: 2 }).toISODate()!;
+  const atWed = (time: string) => DateTime.fromISO(`${wednesday}T${time}`, { zone: TZ }).toISO()!;
+  const wedBody = (startsAt: string, email: string) =>
+    body({ providerId: wednesdayProviderId, startsAt, personal: { ...body().personal, email } });
+
+  beforeAll(async () => {
+    wednesdayProviderId = (
+      await createProvider(
+        admin(),
+        { providerType: "THERAPIST", displayName: `${TAG} Wednesday`, gender: "MALE", acceptsMale: true, acceptsFemale: false, serviceIds: [hijamaServiceId] },
+        ctx,
+      )
+    ).id;
+    createdProviderIds.push(wednesdayProviderId);
+    await setWeeklySchedule(admin(), wednesdayProviderId, { timezone: TZ, days: [{ dayOfWeek: 3, intervals: [{ start: "09:00", end: "17:00" }] }] }, ctx);
+  });
+
+  it("offers a time with its provider-local label and the matching UTC instant", async () => {
+    const slots = await publicSlots({ service: "hijama-therapy", provider: wednesdayProviderId, package: packageId, date: wednesday });
+    const nine = slots.slots.find((s) => s.time === "09:00");
+    expect(slots.timezone).toBe(TZ);
+    expect(nine?.startsAt).toBe(DateTime.fromISO(`${wednesday}T09:00`, { zone: TZ }).toUTC().toISO());
+    expect(nine?.date).toBe(wednesday);
+  });
+
+  it("stops offering a time once it is booked, and refuses a late submission for it with a clear message", async () => {
+    const startsAt = atWed("09:00");
+    const first = await submitPublicBooking(wedBody(startsAt, `stale-a-${TAG}@example.test`), null);
+    createdBookingIds.push(await idFor(first.bookingNumber));
+
+    const after = await publicSlots({ service: "hijama-therapy", provider: wednesdayProviderId, package: packageId, date: wednesday });
+    expect(after.slots.some((s) => s.time === "09:00")).toBe(false);
+    const dates = await publicAvailableDates({ service: "hijama-therapy", provider: wednesdayProviderId, package: packageId, from: wednesday, to: wednesday });
+    expect(dates.dates).toEqual([wednesday]); // the day still has other free times
+
+    const err = await errorOf(submitPublicBooking(wedBody(startsAt, `stale-b-${TAG}@example.test`), null));
+    expect(["SLOT_UNAVAILABLE", "VALIDATION_ERROR"]).toContain(err.code);
+    expect(err.message.length).toBeGreaterThan(10);
+    const held = await prisma.appointment.count({ where: { providerId: wednesdayProviderId, startsAt: new Date(startsAt), status: "PENDING_PAYMENT" } });
+    expect(held).toBe(1);
   });
 });

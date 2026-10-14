@@ -13,6 +13,11 @@ const csv = z
       .filter(Boolean),
   );
 
+/** Bare browser origins only (scheme://host[:port]) — no wildcard, path or trailing slash, so a typo can't widen access. */
+const originList = csv.pipe(
+  z.array(z.string().regex(/^https?:\/\/[^/*\s]+$/, "must be a bare origin like https://example.com (no wildcard, path or trailing slash)")),
+);
+
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
@@ -22,6 +27,10 @@ const EnvSchema = z.object({
   TRUST_PROXY_HOPS: z.coerce.number().int().min(0).default(0),
 
   CORS_ORIGINS: csv.default(["http://localhost:3000"]),
+  // Origins allowed to READ the public availability endpoints from a browser (the WordPress
+  // team-page calendar). Kept apart from CORS_ORIGINS on purpose: these origins get GET-only,
+  // credential-less access to /public/team and /public/availability and nothing else. Empty = off.
+  PUBLIC_CORS_ORIGINS: originList.default([]),
   APP_URL: z.url().default("http://localhost:3000"),
   API_URL: z.url().default("http://localhost:4000"),
 
@@ -106,6 +115,12 @@ function loadEnv(): Env {
   // Production never silently "sends" to the console: channels are off until configured.
   env.EMAIL_PROVIDER ??= production ? "disabled" : "console";
   const missing: string[] = [];
+  const insecureOrigins = production ? env.PUBLIC_CORS_ORIGINS.filter((o) => !o.startsWith("https://")) : [];
+  if (insecureOrigins.length) {
+    console.error(`Invalid environment configuration:
+  - PUBLIC_CORS_ORIGINS must be https in production: ${insecureOrigins.join(", ")}`);
+    process.exit(1);
+  }
   if (env.EMAIL_PROVIDER === "smtp" && !env.SMTP_HOST) missing.push("SMTP_HOST (EMAIL_PROVIDER=smtp)");
   if (env.EMAIL_PROVIDER === "resend" && !env.RESEND_API_KEY) missing.push("RESEND_API_KEY (EMAIL_PROVIDER=resend)");
   if (missing.length) {

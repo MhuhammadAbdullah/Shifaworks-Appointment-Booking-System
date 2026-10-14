@@ -74,12 +74,46 @@ export interface PublicServiceDto {
 
 export interface PublicProviderDto {
   id: string;
+  /** The provider's public address — what WordPress profile pages and booking-form links use to refer to them. */
+  slug: string;
   displayName: string;
   designation: string | null;
   experienceYears: number;
   /** "4.8" or null when the provider has no rating yet — hide the stars. */
   rating: string | null;
   photoUrl: string | null;
+}
+
+/** A WordPress team page's mapping key. Same shape `resolveSlug` produces; checked here so junk never reaches the DB. */
+export const publicTeamSlugParamSchema = z.object({
+  slug: z.string().min(1).max(100).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Invalid provider address"),
+});
+export type PublicTeamSlugParam = z.infer<typeof publicTeamSlugParamSchema>;
+
+/** One service a provider currently takes bookings for, with the packages a visitor can pick from. */
+export interface PublicTeamServiceDto {
+  slug: ServiceSlug;
+  name: string;
+  packages: PublicPackageDto[];
+}
+
+/**
+ * Everything the WordPress availability calendar needs about one provider:
+ * enough to choose a service/package and then call the existing public
+ * dates/slots endpoints. No contact details, user ids or internal fields.
+ */
+export interface PublicTeamProfileDto {
+  /** Needed by the existing /public/availability/* endpoints. */
+  id: string;
+  slug: string;
+  displayName: string;
+  designation: string | null;
+  photoUrl: string | null;
+  acceptsMale: boolean;
+  acceptsFemale: boolean;
+  /** IANA zone the provider's slot times are expressed in. */
+  timezone: string;
+  services: PublicTeamServiceDto[];
 }
 
 export const publicProvidersQuerySchema = z.object({
