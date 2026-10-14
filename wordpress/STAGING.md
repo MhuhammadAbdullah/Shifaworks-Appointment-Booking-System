@@ -45,7 +45,7 @@ rate-limit bucket (300 requests/minute by default), so one busy period could loc
 ## 2. Install the plugin on staging WordPress
 
 Plugin ZIP: `wordpress/dist/shifa-availability-1.0.0.zip` (git-ignored build output). SHA-256:
-`b2476799e65e2fb241034623393a19458b89a129c9e001c47a4e2e23c1f9e190`. Rebuild it from `wordpress/shifa-availability/` if you change a file.
+`ab2a5cd3dcfa3f428e89b7814d5f8c633d4c2a0eb4f9c12f7a4e52728615d761`. Rebuild it from `wordpress/shifa-availability/` if you change a file.
 
 1. Plugins > Add New > Upload Plugin > the ZIP > Activate. Expect no notices or warnings.
 2. Settings > ShifaWorks Availability: Booking API address `https://<staging-api>/api/v1`, Booking website `https://<staging-web>`.

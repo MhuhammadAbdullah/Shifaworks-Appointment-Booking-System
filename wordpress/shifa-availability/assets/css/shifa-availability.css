@@ -53,14 +53,26 @@
 .shifa-av__day.is-active { background: var(--shifa-accent); color: var(--shifa-ink); }
 
 .shifa-av__times-title { margin: 0 0 8px; font-weight: 600; text-align: center; }
-.shifa-av__slots { display: grid; gap: 8px; }
+.shifa-av__slots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }
 .shifa-av__slot { padding: 9px 10px; border: 1px solid var(--shifa-border); border-radius: 6px; background: #fff; font: inherit; color: #1d2530; cursor: pointer; }
 .shifa-av__slot:hover, .shifa-av__slot:focus { background: var(--shifa-accent); border-color: var(--shifa-accent); color: var(--shifa-ink); }
 
 .shifa-av button:focus-visible, .shifa-av select:focus-visible, .shifa-av a:focus-visible { outline: 2px solid #2271b1; outline-offset: 2px; }
 
+
+.shifa-av__chip { display: inline-block; margin: 6px 0 4px; padding: 4px 10px; border-radius: 999px; background: #f1f7e9; color: #2f4a12; font-size: 0.9em; font-weight: 600; }
+.shifa-av__next { margin: 8px 0; padding: 8px 12px; border-radius: 6px; background: #f1f7e9; color: #2f4a12; font-weight: 600; }
+.shifa-av__period { margin: 10px 0 6px; font-size: 0.8em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--shifa-muted); }
+.shifa-av__legend { margin: 10px 0 0; font-size: 0.8em; color: var(--shifa-muted); }
+.shifa-av__dot { display: inline-block; width: 10px; height: 10px; margin-right: 2px; border-radius: 3px; vertical-align: -1px; }
+.shifa-av__dot.is-open { background: #dff0c8; border: 1px solid var(--shifa-accent); }
+.shifa-av__dot.is-full { background: #eef1f4; }
+.shifa-av__skeleton { height: 280px; border-radius: 8px; background: linear-gradient(90deg, #eef1f4 25%, #f6f8fa 37%, #eef1f4 63%); background-size: 400% 100%; animation: shifa-av-shimmer 1.4s ease infinite; }
+@keyframes shifa-av-shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+.shifa-av__slot:disabled { opacity: 0.6; cursor: progress; }
+@media (prefers-reduced-motion: reduce) { .shifa-av__skeleton { animation: none; } }
+
 @media (max-width: 600px) {
 	.shifa-av__layout { grid-template-columns: 1fr; }
 	.shifa-av__times { border-left: 0; border-top: 1px solid var(--shifa-border); max-height: none; }
-	.shifa-av__slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

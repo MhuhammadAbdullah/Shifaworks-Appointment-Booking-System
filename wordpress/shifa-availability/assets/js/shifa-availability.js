@@ -17,6 +17,11 @@
 	var WINDOW_DAYS = 61; // the API allows < 62 days per dates request
 	var REFRESH_MS = 60 * 1000;
 	var WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+	var PERIODS = [
+		{ label: 'Morning', test: function (h) { return h < 12; } },
+		{ label: 'Afternoon', test: function (h) { return h >= 12 && h < 17; } },
+		{ label: 'Evening', test: function (h) { return h >= 17; } }
+	];
 
 	function el(tag, className, text) {
 		var node = document.createElement(tag);
@@ -31,8 +36,7 @@
 
 	/** YYYY-MM-DD for an instant in an IANA zone. */
 	function localDate(date, zone) {
-		var parts = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-		return parts;
+		return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 	}
 
 	function addDays(iso, n) {
@@ -51,6 +55,10 @@
 
 	function dayLabel(iso) {
 		return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(iso + 'T00:00:00Z'));
+	}
+
+	function shortDayLabel(iso) {
+		return new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(iso + 'T00:00:00Z'));
 	}
 
 	function time12(hhmm) {
@@ -82,11 +90,12 @@
 		this.from = null;
 		this.to = null;
 		this.viewMonth = null;
-		this.dates = null; // { dates:Set, closed:Set, timezone }
+		this.dates = null; // { dates:Set, closed:Set }
 		this.date = null;
 		this.slots = null;
 		this.loadingDates = false;
 		this.loadingSlots = false;
+		this.leaving = false;
 		this.error = '';
 		this.datesAbort = null;
 		this.slotsAbort = null;
@@ -172,10 +181,13 @@
 		this.request('/public/availability/dates', q, this.datesAbort ? this.datesAbort.signal : undefined).then(
 			function (data) {
 				if (sel !== self.pkg) return;
+				var first = !self.dates;
 				self.loadingDates = false;
 				self.error = '';
 				self.zone = data.timezone || self.zone;
 				self.dates = { dates: new Set(data.dates || []), closed: new Set(data.closedDates || []) };
+				// Open on the month of the first free date, so the visitor lands on something bookable.
+				if (first && data.dates && data.dates.length) self.viewMonth = data.dates[0].slice(0, 7) + '-01';
 				// The day being looked at may have just filled up.
 				if (self.date && !self.dates.dates.has(self.date)) {
 					self.date = null;
@@ -224,7 +236,7 @@
 
 	/** Re-read availability so a slot taken minutes ago disappears without a page reload. */
 	Calendar.prototype.refresh = function () {
-		if (this.service && this.pkg && !this.loadingDates) this.loadDates();
+		if (this.service && this.pkg && !this.loadingDates && !this.leaving) this.loadDates();
 	};
 
 	Calendar.prototype.go = function (startsAt) {
@@ -233,7 +245,15 @@
 			'?provider=' + encodeURIComponent(this.profile.slug) +
 			'&package=' + encodeURIComponent(this.pkg.id) +
 			'&start=' + encodeURIComponent(startsAt);
+		this.leaving = true; // stop refreshing and show that something is happening
+		this.render();
 		window.location.href = url;
+	};
+
+	Calendar.prototype.firstFreeDate = function () {
+		if (!this.dates || !this.dates.dates.size) return null;
+		var all = Array.from(this.dates.dates).sort();
+		return all[0];
 	};
 
 	Calendar.prototype.render = function () {
@@ -251,14 +271,14 @@
 		// 1. service and package
 		var pickers = el('div', 'shifa-av__pickers');
 		if (p.services.length > 1) {
-			pickers.appendChild(this.select('Service', p.services, this.service, function (item) {
+			pickers.appendChild(this.select('1. Service', p.services, this.service, function (item) {
 				self.service = item;
 				self.pkg = item.packages.length === 1 ? item.packages[0] : null;
 				self.onSelectionChange();
 			}, 'Choose a service'));
 		}
 		if (this.service && this.service.packages.length > 1) {
-			pickers.appendChild(this.select('Session', this.service.packages, this.pkg, function (item) {
+			pickers.appendChild(this.select(p.services.length > 1 ? '2. Session' : '1. Session', this.service.packages, this.pkg, function (item) {
 				self.pkg = item;
 				self.onSelectionChange();
 			}, 'Choose a session', function (item) {
@@ -267,8 +287,8 @@
 		}
 		if (pickers.childNodes.length) this.body.appendChild(pickers);
 
-		if (this.service && this.pkg && this.service.packages.length === 1 && p.services.length === 1) {
-			this.body.appendChild(el('p', 'shifa-av__note', this.pkg.name + ' - ' + this.pkg.durationMinutes + ' min'));
+		if (this.service && this.pkg && this.service.packages.length === 1) {
+			this.body.appendChild(el('p', 'shifa-av__chip', (p.services.length > 1 ? this.service.name + ': ' : '') + this.pkg.name + ' - ' + this.pkg.durationMinutes + ' min'));
 		}
 
 		// 2. nothing is offered until both are chosen
@@ -283,7 +303,7 @@
 			this.body.appendChild(err);
 		}
 		if (this.loadingDates && !this.dates) {
-			this.body.appendChild(el('p', 'shifa-av__hint', 'Loading availability...'));
+			this.body.appendChild(this.skeleton());
 			return;
 		}
 		if (!this.dates) {
@@ -296,11 +316,21 @@
 			return;
 		}
 
+		var first = this.firstFreeDate();
+		if (first) this.body.appendChild(el('p', 'shifa-av__next', 'Next available: ' + shortDayLabel(first)));
+
 		var layout = el('div', 'shifa-av__layout');
 		layout.appendChild(this.calendarGrid());
 		layout.appendChild(this.timesPanel());
 		this.body.appendChild(layout);
-		this.body.appendChild(el('p', 'shifa-av__zone', 'Times are shown in ' + zoneLabel(this.zone) + '.'));
+		this.body.appendChild(el('p', 'shifa-av__zone', 'Times are shown in ' + zoneLabel(this.zone) + '. Choose a time to continue to the booking form.'));
+	};
+
+	Calendar.prototype.skeleton = function () {
+		var box = el('div', 'shifa-av__skeleton');
+		box.setAttribute('aria-busy', 'true');
+		box.setAttribute('aria-label', 'Loading availability');
+		return box;
 	};
 
 	Calendar.prototype.bookingLink = function () {
@@ -380,6 +410,12 @@
 			grid.appendChild(btn);
 		}
 		box.appendChild(grid);
+		var legend = el('p', 'shifa-av__legend');
+		legend.appendChild(el('span', 'shifa-av__dot is-open'));
+		legend.appendChild(document.createTextNode(' Available   '));
+		legend.appendChild(el('span', 'shifa-av__dot is-full'));
+		legend.appendChild(document.createTextNode(' Fully booked'));
+		box.appendChild(legend);
 		return box;
 	};
 
@@ -407,14 +443,21 @@
 			panel.appendChild(el('p', 'shifa-av__hint', 'No free times on this date.'));
 			return panel;
 		}
-		var list = el('div', 'shifa-av__slots');
-		this.slots.forEach(function (s) {
-			var b = el('button', 'shifa-av__slot', time12(s.time));
-			b.type = 'button';
-			b.addEventListener('click', function () { self.go(s.startsAt); });
-			list.appendChild(b);
+		PERIODS.forEach(function (period) {
+			var inPeriod = self.slots.filter(function (s) { return period.test(Number(s.time.slice(0, 2))); });
+			if (!inPeriod.length) return;
+			panel.appendChild(el('p', 'shifa-av__period', period.label));
+			var list = el('div', 'shifa-av__slots');
+			inPeriod.forEach(function (s) {
+				var b = el('button', 'shifa-av__slot', time12(s.time));
+				b.type = 'button';
+				b.disabled = self.leaving;
+				b.addEventListener('click', function () { self.go(s.startsAt); });
+				list.appendChild(b);
+			});
+			panel.appendChild(list);
 		});
-		panel.appendChild(list);
+		if (this.leaving) panel.appendChild(el('p', 'shifa-av__hint', 'Opening the booking form...'));
 		return panel;
 	};
 
