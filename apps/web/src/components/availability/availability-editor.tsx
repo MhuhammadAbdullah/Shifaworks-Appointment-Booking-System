@@ -321,7 +321,7 @@ function CustomHoursCalendarCard({
         </div>
 
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          <div className="w-full max-w-2xl shrink-0 rounded-lg border p-3">
+          <div className="w-full max-w-xs shrink-0 rounded-lg border p-3">
             <div className="mb-2 flex items-center justify-between">
               <Button type="button" variant="ghost" size="icon" className="size-7" onClick={() => setCursor((c) => shiftMonth(c, -1))} aria-label="Previous month">
                 <ChevronLeft className="size-4" />
@@ -354,7 +354,7 @@ function CustomHoursCalendarCard({
                     disabled={readOnly}
                     onClick={() => toggleDate(d)}
                     className={cn(
-                      "flex aspect-square flex-col items-center justify-center gap-0.5 rounded-md text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed",
+                      "flex h-9 flex-col items-center justify-center gap-0.5 rounded-md text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed",
                       isSelected && "border-2 border-primary font-medium",
                       !isSelected && status === "OFF" && "bg-muted-foreground/10 text-muted-foreground",
                       isToday && "ring-2 ring-ring",
@@ -383,7 +383,7 @@ function CustomHoursCalendarCard({
           </div>
 
           {visibleSelected.length > 0 && (
-            <div className="grid w-full gap-3 rounded-md bg-muted/50 p-3 lg:max-h-[26rem] lg:flex-1 lg:overflow-y-auto">
+            <div className="grid w-full min-w-0 gap-3 rounded-md bg-muted/50 p-3 lg:max-h-[26rem] lg:flex-1 lg:overflow-y-auto">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium">
                   {visibleSelected.length} date{visibleSelected.length === 1 ? "" : "s"} selected
