@@ -21,6 +21,7 @@ export function YourDetailsStep<TValues extends BaseBookingValues>({
   packageNoun,
   detailsLabel,
   DetailsStep,
+  preselectProviderSlug,
   onProviderSelect,
   onPackageSelect,
 }: StepProps<TValues> & {
@@ -30,6 +31,7 @@ export function YourDetailsStep<TValues extends BaseBookingValues>({
   packageNoun: string;
   detailsLabel: string;
   DetailsStep: DetailsStepComponent<TValues>;
+  preselectProviderSlug: string | null;
   onProviderSelect: (provider: PublicProviderDto) => void;
   onPackageSelect: (pkg: PublicPackageDto) => void;
 }) {
@@ -40,7 +42,14 @@ export function YourDetailsStep<TValues extends BaseBookingValues>({
       {/* With no packages at all, the service is unbookable regardless of providers — show just the
           one "nothing available" card from PackageStep instead of duplicating it with ProviderStep's own. */}
       {service.packages.length > 0 && (
-        <ProviderStep form={form} slug={slug} service={service} providerNoun={providerNoun} onSelect={onProviderSelect} />
+        <ProviderStep
+          form={form}
+          slug={slug}
+          service={service}
+          providerNoun={providerNoun}
+          preselectSlug={preselectProviderSlug}
+          onSelect={onProviderSelect}
+        />
       )}
       <PackageStep form={form} service={service} packageNoun={packageNoun} onSelect={onPackageSelect} />
       <Separator />

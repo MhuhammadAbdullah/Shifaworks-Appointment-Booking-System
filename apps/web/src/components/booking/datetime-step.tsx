@@ -10,6 +10,7 @@ import { usePublicAvailableDates, usePublicSlots } from "@/lib/api/public";
 import { publicEnv } from "@/lib/env";
 import { addDays, formatTime12, localDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { isSlotOffered, zonedDate } from "./prefill";
 import type { BaseBookingValues, StepProps } from "./wizard-types";
 
 const WINDOW_DAYS = 61; // < MAX_DATE_RANGE_DAYS (62)
@@ -37,9 +38,13 @@ export function DateTimeStep<TValues extends BaseBookingValues>({
 
   const from = useMemo(() => localDate(new Date(), publicEnv.NEXT_PUBLIC_DEFAULT_TIMEZONE), []);
   const to = useMemo(() => addDays(from, WINDOW_DAYS), [from]);
-  const [date, setDate] = useState<string | null>(startsAt ? startsAt.slice(0, 10) : null);
+  // The calendar day of a prefilled/previously chosen time, in the clinic's zone - not slice(0, 10) of
+  // the UTC instant, which lands on the previous day for early-morning slots east of UTC.
+  const [date, setDate] = useState<string | null>(() =>
+    startsAt ? zonedDate(startsAt, publicEnv.NEXT_PUBLIC_DEFAULT_TIMEZONE) : null,
+  );
   // The first of the currently viewed month, clamped to the bookable window.
-  const [viewMonth, setViewMonth] = useState(() => `${from.slice(0, 7)}-01`);
+  const [viewMonth, setViewMonth] = useState(() => `${(date && date >= from && date <= to ? date : from).slice(0, 7)}-01`);
 
   const query = providerId && packageId ? { slug, providerId, packageId, from, to } : null;
   const dates = usePublicAvailableDates(query);
@@ -48,6 +53,17 @@ export function DateTimeStep<TValues extends BaseBookingValues>({
   useEffect(() => {
     if (dates.data?.timezone) onTimezone(dates.data.timezone);
   }, [dates.data?.timezone, onTimezone]);
+
+  // A chosen time that the API no longer offers (taken meanwhile, or a stale link) is dropped rather than
+  // silently submitted; the server would reject it anyway.
+  const [timeGone, setTimeGone] = useState(false);
+  useEffect(() => {
+    if (!startsAt || !slots.data || slots.data.date !== date) return;
+    if (!isSlotOffered(slots.data.slots, startsAt)) {
+      form.setValue("startsAt" as never, "" as never, { shouldValidate: false });
+      setTimeGone(true);
+    }
+  }, [slots.data, startsAt, date, form]);
 
   const available = new Set(dates.data?.dates ?? []);
   const closed = new Set(dates.data?.closedDates ?? []);
@@ -127,7 +143,10 @@ export function DateTimeStep<TValues extends BaseBookingValues>({
                     )}
                     onClick={() => {
                       setDate(d);
-                      if (startsAt && !startsAt.startsWith(d)) form.setValue("startsAt" as never, "" as never, { shouldValidate: false });
+                      setTimeGone(false);
+                      if (startsAt && !(slots.data?.date === d && isSlotOffered(slots.data.slots, startsAt))) {
+                        form.setValue("startsAt" as never, "" as never, { shouldValidate: false });
+                      }
                     }}
                   >
                     <span>{Number(d.slice(8))}</span>
@@ -176,6 +195,7 @@ export function DateTimeStep<TValues extends BaseBookingValues>({
       {dates.data && available.size === 0 && (
         <p className="text-sm text-muted-foreground">No free times in the next two months. Please contact support.</p>
       )}
+      {timeGone && !startsAt && <p className="text-sm text-destructive">That time is no longer available. Please choose another.</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );

@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { useForm, type DefaultValues, type FieldPath, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -11,6 +12,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api-client";
 import { publicEnv } from "@/lib/env";
+import { formatDate, formatTime12 } from "@/lib/format";
 import { useServiceBootstrap, useSubmitBooking } from "@/lib/api/public";
 import { HoneypotField, ReviewStep } from "./steps";
 import { YourDetailsStep } from "./your-details-step";
@@ -18,6 +20,7 @@ import { DateTimeStep } from "./datetime-step";
 import { RegistrationClosed } from "./registration-closed";
 import { BookingSuccess } from "./booking-success";
 import { WizardHeader } from "./wizard-header";
+import { parseBookingPrefill } from "./prefill";
 import type { BaseBookingValues, DetailsStepComponent } from "./wizard-types";
 
 export interface BookingWizardProps<TValues extends BaseBookingValues> {
@@ -67,6 +70,25 @@ export function BookingWizard<TValues extends BaseBookingValues>({
     mode: "onTouched",
   });
 
+  // A link from a WordPress team page can arrive with package + time already chosen (the provider is
+  // matched by ProviderStep, since the provider list only loads once the visitor has picked a gender).
+  const searchParams = useSearchParams();
+  const prefill = useMemo(() => parseBookingPrefill(searchParams), [searchParams]);
+  const prefillApplied = useRef(false);
+  const chosenStart = form.watch("startsAt" as FieldPath<TValues>) as unknown as string | undefined;
+  const bootstrapData = bootstrap.data;
+  useEffect(() => {
+    if (prefillApplied.current || !bootstrapData) return;
+    prefillApplied.current = true;
+    const chosen = prefill.packageId ? bootstrapData.packages.find((p) => p.id === prefill.packageId) : undefined;
+    if (chosen) {
+      form.setValue("packageId" as FieldPath<TValues>, chosen.id as never, { shouldDirty: true });
+      setPkg(chosen);
+      // A time only makes sense together with the package it was picked for (the duration decides the slots).
+      if (prefill.startsAt) form.setValue("startsAt" as FieldPath<TValues>, prefill.startsAt as never, { shouldDirty: true });
+    }
+  }, [bootstrapData, prefill, form]);
+
   if (bootstrap.isPending) {
     return (
       <div className="mx-auto grid w-full max-w-2xl gap-4">
@@ -108,6 +130,7 @@ export function BookingWizard<TValues extends BaseBookingValues>({
           packageNoun={definition.packageNoun}
           detailsLabel={detailsLabel}
           DetailsStep={DetailsStep}
+          preselectProviderSlug={prefill.providerSlug}
           onProviderSelect={setProvider}
           onPackageSelect={setPkg}
         />
@@ -146,6 +169,12 @@ export function BookingWizard<TValues extends BaseBookingValues>({
   return (
     <div className="mx-auto w-full max-w-2xl">
       <WizardHeader step={step} total={STEPS.length} label={current.label} title={title} />
+      {step === 0 && prefill.startsAt && pkg && chosenStart === prefill.startsAt && (
+        <p className="mb-3 rounded-md border bg-muted/40 p-3 text-sm">
+          You chose {formatDate(prefill.startsAt, timezone)} at {formatTime12(prefill.startsAt, timezone)}. Fill in your details and we&apos;ll
+          keep it, if it&apos;s still free.
+        </p>
+      )}
       <Card>
         <CardContent className="relative pt-6">
           {current.node}

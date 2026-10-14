@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { publicEnv } from "@/lib/env";
 import { usePublicBranding } from "@/lib/api/public";
 
@@ -19,7 +19,8 @@ export default function BookingLayout({ children }: { children: ReactNode }) {
           )}
         </a>
       </div>
-      {children}
+      {/* The booking wizard reads ?provider=&package=&start= (useSearchParams), which needs a Suspense boundary. */}
+      <Suspense fallback={null}>{children}</Suspense>
     </main>
   );
 }

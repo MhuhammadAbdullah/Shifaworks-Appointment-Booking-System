@@ -22,6 +22,7 @@ import { Field, fieldA11y } from "@/components/forms/field";
 import { AvailabilityEditor } from "@/components/availability/availability-editor";
 import { SlotPreview } from "@/components/availability/slot-preview";
 import { ProviderProfileForm } from "@/components/providers/provider-profile-form";
+import { WebsiteCalendarCard } from "@/components/providers/website-calendar-card";
 import { UserStatusBadge } from "@/components/dashboard/status-badge";
 import { InvoiceStatusBadge } from "@/components/finance/status-badges";
 import { usePermissions } from "@/lib/auth/hooks";
@@ -97,6 +98,7 @@ export default function ProviderDetailPage() {
           <TabsTrigger value="availability">Availability</TabsTrigger>
         </TabsList>
         <TabsContent value="profile" className="mt-4 grid gap-6">
+          <WebsiteCalendarCard provider={provider} />
           <ProviderProfileForm provider={provider} mode="admin" readOnly={!canEdit} onSave={(body) => update.mutateAsync(body)} />
           <div className="grid gap-6 lg:grid-cols-2">
             <ServicesCard provider={provider} readOnly={!canEdit} />
