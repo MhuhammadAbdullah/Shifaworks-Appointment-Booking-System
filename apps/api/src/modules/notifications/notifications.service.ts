@@ -81,6 +81,21 @@ export async function retryNotification(p: Principal, id: string, ctx: AuditCont
   return getNotification(p, id);
 }
 
+/**
+ * Puts every failed email back in the queue with fresh attempts - for after the cause (a blocked SMTP port, a wrong
+ * key, an unverified sender) has been fixed. Only the last 30 days, so very old failures are not suddenly sent.
+ */
+export async function retryFailedNotifications(p: Principal, ctx: AuditContext): Promise<{ retried: number }> {
+  const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const r = await prisma.notification.updateMany({
+    where: { organizationId: p.organizationId, channel: "EMAIL", status: "FAILED", createdAt: { gte: since } },
+    data: { status: "QUEUED", attempts: 0, lastError: null, scheduledFor: null },
+  });
+  await recordAudit(prisma, ctx, { action: "notification.retry_failed", entityType: "notification", entityId: null, newValues: { retried: r.count } });
+  if (r.count > 0) requestDispatch();
+  return { retried: r.count };
+}
+
 /** Sends one message with sample values to check the channel works — no bookingId, delivered synchronously. */
 export async function sendTest(p: Principal, input: TestNotificationInput, ctx: AuditContext): Promise<NotificationDetailDto> {
   const template = await prisma.emailTemplate.findFirst({ where: { organizationId: p.organizationId, key: input.templateKey, audience: input.audience } });

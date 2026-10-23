@@ -43,6 +43,14 @@ export function useNotification(id: string) {
   });
 }
 
+export function useRetryFailedNotifications() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => data(authedRequest<{ retried: number }>("/notifications/retry-failed", { method: "POST" })),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: notificationKeys.listAll }),
+  });
+}
+
 export function useRetryNotification() {
   const qc = useQueryClient();
   return useMutation({

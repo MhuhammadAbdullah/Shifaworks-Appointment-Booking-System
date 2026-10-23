@@ -25,6 +25,11 @@ export const retryNotification: RequestHandler = async (req, res) => {
   sendOk(res, await notifications.retryNotification(principalOf(req), params.id, auditContextFrom(req)), "Queued for another attempt");
 };
 
+export const retryFailed: RequestHandler = async (req, res) => {
+  const result = await notifications.retryFailedNotifications(principalOf(req), auditContextFrom(req));
+  sendOk(res, result, result.retried === 0 ? "No failed emails to retry" : `${result.retried} email${result.retried === 1 ? "" : "s"} queued again`);
+};
+
 export const sendTest: RequestHandler = async (req, res) => {
   const { body } = validated<TestNotificationInput>(req);
   sendOk(res, await notifications.sendTest(principalOf(req), body, auditContextFrom(req)));

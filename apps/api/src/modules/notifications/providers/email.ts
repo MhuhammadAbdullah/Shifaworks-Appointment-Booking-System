@@ -6,6 +6,22 @@ import { DeliveryError, type EmailMessage, type EmailProvider, type SendResult }
 
 const TIMEOUT_MS = 15_000;
 
+/**
+ * Plain-language reason for an SMTP failure that never reached the mail server. A timeout / unreachable / refused
+ * connection from a cloud host almost always means the host blocks outbound SMTP (Render, for one, blocks ports
+ * 25, 465 and 587), which retrying will not fix - the message says so and names the way out.
+ */
+export function describeSmtpFailure(e: { message?: string; code?: string }, host: string | undefined, port: number): string {
+  const raw = e.message ?? e.code ?? "send failed";
+  const unreachable = /ETIMEDOUT|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH|ESOCKET|Connection timeout|Greeting never received/i.test(`${e.code ?? ""} ${raw}`);
+  if (!unreachable) return `SMTP: ${raw}`;
+  return (
+    `SMTP: could not reach ${host ?? "the mail server"}:${port} (${raw.slice(0, 80)}). ` +
+    "This server cannot open an outbound SMTP connection - hosts such as Render block ports 25/465/587. " +
+    "Switch EMAIL_PROVIDER to resend (HTTPS) or use an SMTP relay on port 2525."
+  );
+}
+
 /** SMTP (any mail server, Gmail/Workspace, SES/Mailgun/Brevo SMTP relays). */
 export class SmtpEmailProvider implements EmailProvider {
   readonly name = "smtp";
@@ -44,7 +60,7 @@ export class SmtpEmailProvider implements EmailProvider {
       const e = err as { responseCode?: number; message?: string; code?: string };
       // SMTP 5xx = permanent (unknown mailbox, policy); 4xx and network errors = try again later.
       const permanent = typeof e.responseCode === "number" && e.responseCode >= 500;
-      throw new DeliveryError(`SMTP: ${e.message ?? e.code ?? "send failed"}`, permanent, { code: e.code, responseCode: e.responseCode });
+      throw new DeliveryError(describeSmtpFailure(e, env.SMTP_HOST, env.SMTP_PORT), permanent, { code: e.code, responseCode: e.responseCode });
     }
   }
 }

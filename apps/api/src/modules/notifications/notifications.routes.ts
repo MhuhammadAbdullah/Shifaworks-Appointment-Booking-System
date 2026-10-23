@@ -9,6 +9,7 @@ notificationsRouter.use(requireAuth);
 
 notificationsRouter.get("/channel-status", requireAnyPermission("notifications.view", "notifications.manage_templates"), controller.channelStatus);
 notificationsRouter.post("/test", requirePermission("notifications.send"), validate({ body: testNotificationSchema }), controller.sendTest);
+notificationsRouter.post("/retry-failed", requirePermission("notifications.send"), controller.retryFailed);
 notificationsRouter.get("/", requirePermission("notifications.view"), validate({ query: listNotificationsQuerySchema }), controller.listNotifications);
 notificationsRouter.get("/:id", requirePermission("notifications.view"), validate({ params: idParamSchema }), controller.getNotification);
 notificationsRouter.post("/:id/retry", requirePermission("notifications.send"), validate({ params: idParamSchema }), controller.retryNotification);

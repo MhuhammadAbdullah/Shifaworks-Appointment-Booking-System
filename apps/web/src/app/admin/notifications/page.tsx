@@ -1,8 +1,10 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { RotateCcw, Search } from "lucide-react";
+import { toast } from "sonner";
 import { EMAIL_TEMPLATE_KEYS, EMAIL_TEMPLATE_KEY_LABELS, NOTIFICATION_STATUSES, NOTIFICATION_STATUS_LABELS, type EmailTemplateKey } from "@booking/shared";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,7 +14,9 @@ import { Pagination } from "@/components/tables/pagination";
 import { StatusFilter } from "@/components/tables/status-filter";
 import { NotificationStatusBadge } from "@/components/notifications/status-badges";
 import { NotificationDetailDialog } from "@/components/notifications/notification-detail-dialog";
-import { useNotifications } from "@/lib/api/notifications";
+import { useNotifications, useRetryFailedNotifications } from "@/lib/api/notifications";
+import { usePermissions } from "@/lib/auth/hooks";
+import { ApiError } from "@/lib/api-client";
 import { useDebounced } from "@/lib/hooks/use-debounced";
 
 const STATUS_OPTIONS = NOTIFICATION_STATUSES.map((s) => ({ value: s, label: NOTIFICATION_STATUS_LABELS[s] }));
@@ -33,6 +37,8 @@ function Notifications() {
   const [viewingId, setViewingId] = useState<string | null>(null);
   const debounced = useDebounced(search);
   useEffect(() => setPage(1), [debounced, status, templateKey]);
+  const { can } = usePermissions();
+  const retryFailed = useRetryFailedNotifications();
 
   const { data, isPending, error } = useNotifications({
     page,
@@ -44,7 +50,27 @@ function Notifications() {
 
   return (
     <div>
-      <PageHeader title="Email log" description="Every message queued for a booking: what was sent, to whom, and whether it landed." />
+      <PageHeader
+        title="Email log"
+        description="Every message queued for a booking: what was sent, to whom, and whether it landed."
+        actions={
+          can("notifications.send") && (
+            <Button
+              variant="outline"
+              disabled={retryFailed.isPending}
+              onClick={() => {
+                if (!window.confirm("Queue every failed email from the last 30 days again? Do this after the email problem has been fixed.")) return;
+                retryFailed.mutate(undefined, {
+                  onSuccess: (r) => toast.success(r.retried === 0 ? "No failed emails to retry" : `${r.retried} email${r.retried === 1 ? "" : "s"} queued again`),
+                  onError: (e) => toast.error(e instanceof ApiError ? e.message : "Could not retry"),
+                });
+              }}
+            >
+              <RotateCcw className="size-4" /> Retry failed emails
+            </Button>
+          )
+        }
+      />
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <StatusFilter options={STATUS_OPTIONS} selected={status} onChange={setStatus} />
         <div className="relative w-full max-w-xs">
